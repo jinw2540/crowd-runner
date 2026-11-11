@@ -94,7 +94,8 @@ body {
 .dock { pointer-events: auto; width: 100%; max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px;
   background: var(--ink); border-radius: 24px; padding: 14px; box-shadow: 0 6px 0 rgba(0, 0, 0, .25); }
 .dock .chip { background: rgba(255, 248, 231, .12); }
-.dock-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.dock-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.acct { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .upgrades { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .up {
   cursor: pointer; text-align: left; border: 0; border-radius: 16px;
@@ -119,7 +120,7 @@ body {
 button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 
 /* Result */
-#result { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(28, 37, 65, .45); padding-block: 20px; }
+#result, #nick { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(28, 37, 65, .45); padding-block: 20px; }
 .card {
   width: 100%; max-width: 380px; background: var(--paper); border-radius: 26px;
   padding: 26px 22px 22px; display: flex; flex-direction: column; gap: 14px; text-align: center;
@@ -128,7 +129,7 @@ button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 .card h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 38px; line-height: 1.05; text-wrap: balance; }
 .card p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--muted); }
 .card .gain { font-family: var(--font-display); font-size: 26px; color: var(--ink); font-variant-numeric: tabular-nums; }
-.go-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.go-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; }
 .go-row .go.alt { font-size: 22px; padding-inline: 22px; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .stars { font-size: 34px; line-height: 1; letter-spacing: 4px; color: var(--sun-deep); }
@@ -191,3 +192,25 @@ button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { .pg-w, .bobber, .aur, .tw, .pop { animation: none; } }
 #fail { position: absolute; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; background: var(--ink); color: var(--paper); font-size: 16px; line-height: 1.6; }
 @media (prefers-reduced-motion: reduce) { .floater { animation-duration: .01s; } }
+
+/* Nickname card and ranking */
+#nick .card input {
+  font-family: var(--font-display); font-size: 24px; text-align: center; color: var(--ink);
+  background: #fff; border: 3px solid var(--ink); border-radius: 14px; padding: 10px 12px 9px; width: 100%; box-sizing: border-box;
+}
+#nick .card .err { color: var(--rival); font-weight: 700; }
+#ranking { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--sea-1); color: var(--paper); }
+.rank-msg { margin: 0; padding-block: 14px; font-size: 15px; line-height: 1.5; text-align: center; }
+#rankList { flex: 1; min-height: 0; overflow-y: auto; margin: 0; padding-block: 10px; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.rank-row, #rankMe {
+  display: grid; grid-template-columns: 2.4em 1fr auto auto; align-items: center; gap: 10px;
+  max-width: 480px; width: 100%; margin-inline: auto; box-sizing: border-box;
+  background: rgba(28, 37, 65, .55); border-radius: 14px; padding: 10px 14px 9px;
+  font-family: var(--font-display); font-size: 17px; font-variant-numeric: tabular-nums;
+}
+.rank-row b, #rankMe b { font-weight: 400; color: var(--sun); text-align: center; }
+.rank-row span:nth-child(2), #rankMe span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rank-row.me { background: var(--sun); color: var(--ink); }
+.rank-row.me b { color: var(--ink); }
+#rankMe { margin-block: 8px 14px; background: var(--ink); box-shadow: 0 4px 0 rgba(0, 0, 0, .25); }
+#rankMe[hidden] { display: none; }

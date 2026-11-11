@@ -22,6 +22,11 @@
       <div class="dock-head">
         <span class="chip" id="mStage">스테이지 1</span>
         <span class="chip coin" id="mCoins">0</span>
+        <div class="acct" id="acct" hidden>
+          <button class="pill" id="signIn" type="button">구글로 로그인</button>
+          <span class="chip" id="nickChip" hidden></span>
+          <button class="pill" id="signOut" type="button" hidden>로그아웃</button>
+        </div>
       </div>
       <div class="upgrades">
         <button class="up" id="upStart" type="button">
@@ -34,6 +39,7 @@
       <div class="go-row">
         <button class="go" id="start" type="button">달리기</button>
         <button class="go alt" id="openMap" type="button">지도</button>
+        <button class="go alt" id="openRank" type="button">랭킹</button>
       </div>
       <p class="hint">좌우로 드래그하거나 ← → 키로 게이트를 고르세요</p>
     </div>
@@ -51,6 +57,27 @@
         <button class="go alt" id="rMenu" type="button">업그레이드</button>
       </div>
     </div>
+  </section>
+
+  <section id="nick" class="gutter" hidden>
+    <form class="card" id="nickForm">
+      <h2>닉네임 정하기</h2>
+      <p>랭킹에 보여줄 이름이에요. 2~12자로 정해 주세요.</p>
+      <input id="nickInput" type="text" minlength="2" maxlength="12" autocomplete="off" aria-label="닉네임">
+      <p id="nickErr" class="err" role="alert" hidden></p>
+      <button class="go" id="nickOk" type="submit">정했어요</button>
+    </form>
+  </section>
+
+  <section id="ranking" hidden>
+    <header class="map-head gutter">
+      <button class="pill" id="rankBack" type="button">돌아가기</button>
+      <h2>전체 랭킹</h2>
+      <span class="chip" id="rankNote">스테이지 → 별</span>
+    </header>
+    <p id="rankMsg" class="rank-msg gutter" hidden></p>
+    <ol id="rankList" class="gutter"></ol>
+    <div id="rankMe" class="gutter" hidden></div>
   </section>
 
   <section id="map" hidden>
@@ -78,7 +105,9 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <script src="js/core.js"></script>
+<script src="js/account.js"></script>
 <script src="js/renderer.js"></script>
 <script src="js/crowd.js"></script>
 <script src="js/scene.js"></script>

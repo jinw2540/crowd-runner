@@ -32,12 +32,17 @@ function refreshUI() {
   $('upIncomeCost').textContent = '코인 ' + costIncome();
   $('upIncome').disabled = d.coins < costIncome();
   $('mute').textContent = d.muted ? '소리 끔' : '소리 켬';
+  const a = Account;
+  $('acct').hidden = !a.enabled;
+  $('signIn').hidden = !!a.user;
+  $('nickChip').hidden = $('signOut').hidden = !a.user;
+  $('nickChip').textContent = a.nickname || '닉네임 없음';
 }
 function toMenu() {
   G.stage = Save.data.level;
   buildLevel(); resetRun();
   G.state = 'menu';
-  $('menu').hidden = false; $('hud').hidden = true; $('result').hidden = true; $('map').hidden = true;
+  $('menu').hidden = false; $('hud').hidden = true; $('result').hidden = true; $('map').hidden = true; $('ranking').hidden = true;
   refreshUI();
 }
 function startRun(rebuild) {
