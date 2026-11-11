@@ -419,9 +419,9 @@ function updateFar(dt, z, t, moving) {
 }
 
 function addFoe(x, z, size, max, isBoss) {
-  const view = new CrowdView(Math.min(size, max), 'crab');
+  const view = new CrowdView('crab');
   view.cx = x; view.cz = z; view.hop = 0.25;
-  view.setCount(size); view.snap();
+  view.setValue(size, { instant: true });
   levelGroup.add(view.group);
   foes.push({ size, view, isBoss, dead: false, acc: 0, rate: 0 });
 }

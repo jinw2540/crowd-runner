@@ -8,8 +8,6 @@ if (!window.THREE) { fail(); throw new Error('Three.js could not be loaded'); }
 
 const W = 5;            // road half width
 const SPEED = 14;       // forward units per second
-const MAXU = 150;       // max drawn units in the player's crowd
-const SPACING = 0.5;
 const SIZE = 1.4;       // character scale
 const SEG = 24;         // distance between level segments
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

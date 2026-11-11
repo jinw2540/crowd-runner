@@ -51,6 +51,7 @@ window.__game = {
   get level() { return Save.data.level; }, get coins() { return Save.data.coins; }, get stage() { return G.stage; },
   get stars() { return Save.data.stars; }, get best() { return Save.data.best; }, starsFor,
   get data() { return level; }, genLevel, applyOp,
+  get units() { return player.tiers.map(l => l.length); }, setCount(n) { G.count = n; sync(); },
   get shadows() { return Q.shadows; }, lockShadows(on) { Q.locked = true; setShadows(on); }
 };
 toMenu();

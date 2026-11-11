@@ -3,8 +3,8 @@
 'use strict';
 
 /* ---------- Game state ---------- */
-const G = { state: 'menu', stage: Save.data.level, nextStage: Save.data.level, count: 1, x: 0, lastX: 0, z: 0, t: 0, fight: null, endTimer: 0, pending: null, walkFrom: 0 };
-const player = new CrowdView(MAXU, 'penguin');
+const G = { state: 'menu', stage: Save.data.level, nextStage: Save.data.level, count: 1, x: 0, lastX: 0, z: 0, t: 0, fight: null, bigHit: 0, endTimer: 0, pending: null, walkFrom: 0 };
+const player = new CrowdView('penguin');
 scene.add(player.group);
 const keys = { l: false, r: false };
 
@@ -13,11 +13,11 @@ const incomeMult = () => 1 + 0.2 * Save.data.upIncome;
 const costStart = () => Math.round(25 * Math.pow(1.45, Save.data.upStart));
 const costIncome = () => Math.round(40 * Math.pow(1.5, Save.data.upIncome));
 
-function sync() { player.setCount(Math.min(G.count, MAXU)); }
+function sync() { player.setValue(G.count); }
 function resetRun() {
   G.count = startCount(); G.x = 0; G.lastX = 0; G.z = 0; G.fight = null; G.pending = null;
-  player.n = 0; player.cx = 0; player.cz = 0; player.hop = 1;
-  sync(); player.snap();
+  player.cx = 0; player.cz = 0; player.hop = 1; G.bigHit = 0;
+  player.setValue(G.count, { instant: true });
   camPos.set(0, 9, 12);
 }
 function refreshUI() {
@@ -149,17 +149,30 @@ function step(dt) {
     }
 
     // Hazards remove only the units that touch them
+    G.bigHit = Math.max(0, G.bigHit - dt);
     for (const h of hazards) {
       if (Math.abs(G.z - h.z) > player.radius + 5) continue;
-      for (let i = player.n - 1; i >= 0; i--) {
-        if (!hitHazard(h, player.wx(i), player.wz(i))) continue;
-        G.count = Math.max(0, G.count - Math.max(1, Math.round(G.count / player.n)));
-        Fx.kill(player.wx(i), player.wz(i), h.type === 'pit');
-        player.removeAt(i);
-        h.type === 'pit' ? Sfx.plop() : Sfx.hit();
+      // A little one that touches a hazard is lost. A bigger one loses about a third of what it is worth
+      // (so a few little ones are knocked out of it), at most once every short while.
+      const wet = h.type === 'pit';
+      let lost = 0, broken = null;
+      player.eachUnit(u => {
+        const f = u.fr * 0.7;
+        const hit = hitHazard(h, u.wx, u.wz) || (u.tier > 0 && (hitHazard(h, u.wx - f, u.wz) || hitHazard(h, u.wx + f, u.wz) || hitHazard(h, u.wx, u.wz - f) || hitHazard(h, u.wx, u.wz + f)));
+        if (!hit) return;
+        if (u.tier === 0) { player.killUnit(u); lost++; Fx.kill(u.wx, u.wz, wet); }
+        else if (G.bigHit <= 0 && !broken) broken = u;
+      });
+      if (broken) {
+        const loss = Math.ceil(TIER_VALUE[broken.tier] * 0.3);
+        lost += loss; G.bigHit = 0.4;
+        for (let j = 0; j < Math.min(loss, 5); j++) Fx.kill(broken.wx + (Math.random() - 0.5) * broken.fr * 2, broken.wz + (Math.random() - 0.5) * broken.fr * 2, wet);
       }
-      if (G.count <= 0) { G.count = 0; player.n = 0; finish(false, '모두 쓰러졌어요'); return; }
-      sync();
+      if (!lost) continue;
+      wet ? Sfx.plop() : Sfx.hit();
+      G.count = Math.max(0, G.count - lost);
+      if (G.count <= 0) { player.setValue(0); finish(false, '모두 쓰러졌어요'); return; }
+      player.setValue(G.count, { prefer: broken });
     }
 
     // Rival crowds cancel one for one
@@ -181,8 +194,8 @@ function step(dt) {
       const k = Math.min(Math.floor(f.acc), G.count, f.size);
       if (k > 0) { f.acc -= k; G.count -= k; f.size -= k; Sfx.hit(); Fx.clash((G.x + f.view.cx) / 2, (G.z + f.view.cz) / 2, k); }
       f.view.cx += (G.x - f.view.cx) * Math.min(1, dt * 4);
-      f.view.setCount(f.size); if (f.view.n > f.size) f.view.n = f.size;
-      sync(); if (player.n > G.count) player.n = G.count;
+      f.view.setValue(f.size);
+      sync();
       if (G.count <= 0) { finish(false, f.isBoss ? '보스 무리가 더 많았어요' : '모두 쓰러졌어요'); return; }
       if (f.size <= 0) {
         f.dead = true; f.view.group.visible = false; G.fight = null;
@@ -212,7 +225,8 @@ function frame(dt) {
   Fx.update(dt);
   for (const f of foes) if (!f.dead) f.view.update(dt, G.t);
 
-  const r = player.radius, far = portrait ? 1.25 : 1, menu = G.state === 'menu';
+  // Pull back and up when big penguins are present so they do not hide the gate ahead
+  const r = player.radius + Math.max(0, player.tall - 1.26) * 1.8, far = portrait ? 1.25 : 1, menu = G.state === 'menu';
   const tx = G.x * 0.45, ty = (7.5 + r * 0.9) * far, tz = G.z + (10 + r * 1.3) * far;
   const k = 1 - Math.exp(-dt * 6);
   camPos.x += (tx - camPos.x) * k; camPos.y += (ty - camPos.y) * k; camPos.z += (tz - camPos.z) * k;
@@ -220,10 +234,10 @@ function frame(dt) {
   camera.lookAt(tx, menu ? -4.5 : 0, G.z - 8);
 
   used = 0;
-  if (G.count > 0) tag(G.x, 2.9, G.z, String(G.count), 'me');
+  if (G.count > 0) tag(G.x, player.tall * 1.6 + 1.2, G.z, String(G.count), 'me');
   for (const f of foes) {
     if (f.dead || f.view.cz < G.z - 75 || f.view.cz > G.z + 3) continue;
-    tag(f.view.cx, 2.8, f.view.cz, String(f.size), 'foe');
+    tag(f.view.cx, f.view.tall * 1.6 + 1.4, f.view.cz, String(f.size), 'foe');
   }
   for (let i = used; i < pool.length; i++) pool[i].hidden = true;
   if (G.state === 'running') $('barFill').style.width = (clamp(G.z / level.bossZ, 0, 1) * 100).toFixed(1) + '%';
