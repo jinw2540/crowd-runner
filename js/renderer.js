@@ -29,13 +29,11 @@ function setShadows(on) {
   if (!on) renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 }
 
-let portrait = false;
 function resize() {
   const w = app.clientWidth || 1, h = app.clientHeight || 1;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
-  portrait = camera.aspect < 0.8;
   const half = Math.atan(Math.tan(27 * Math.PI / 180) / camera.aspect) * 180 / Math.PI;
   camera.fov = clamp(half * 2, 52, 84);
   camera.updateProjectionMatrix();

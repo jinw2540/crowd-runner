@@ -226,8 +226,8 @@ function frame(dt) {
   for (const f of foes) if (!f.dead) f.view.update(dt, G.t);
 
   // Pull back and up when big penguins are present so they do not hide the gate ahead
-  const r = player.radius + Math.max(0, player.tall - 1.26) * 1.8, far = portrait ? 1.25 : 1, menu = G.state === 'menu';
-  const tx = G.x * 0.45, ty = (7.5 + r * 0.9) * far, tz = G.z + (10 + r * 1.3) * far;
+  const r = player.radius + Math.max(0, player.tall - 1.26) * 1.8, menu = G.state === 'menu';
+  const tx = G.x * 0.45, ty = 7.5 + r * 0.9, tz = G.z + 10 + r * 1.3;
   const k = 1 - Math.exp(-dt * 6);
   camPos.x += (tx - camPos.x) * k; camPos.y += (ty - camPos.y) * k; camPos.z += (tz - camPos.z) * k;
   camera.position.copy(camPos);
