@@ -35,68 +35,65 @@ function merge(parts) {
   out.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return out;
 }
-const NAVY = 0x3152c4, SNOW = 0xffffff, BEAK = 0xff9f1c, FOOT = 0xffc21a, CRAB = 0xf23d4f, CRAB_D = 0xc4213a;
-const CAP = 0x233c96, SADDLE = 0x5078ea, GREY = 0xb4b4b4;   // GREY darkens whatever colour a scarf is tinted with
+const NAVY = 0x27408b, SNOW = 0xffffff, BEAK = 0xff9f1c, FOOT = 0xffc21a, CRAB = 0xf23d4f, CRAB_D = 0xc4213a;
+const CAP = 0x1c3070, GREY = 0xb4b4b4;   // GREY darkens whatever colour a scarf is tinted with
 const MODELS = {
-  // Penguin faces -z (away from the camera). Proportions are close to two heads tall so that, seen from
-  // behind, each one reads as a big round head on a small body, with white cheeks showing at the sides.
+  // Penguin faces -z (away from the camera): navy back with a lighter saddle, white belly, yellow feet, stubby tail.
   penguin: {
     body: merge([
-      ball(0.225, 1, 1.1, 0.95, 0, 0.28, 0, NAVY, 12),
-      ball(0.19, 0.8, 0.9, 0.5, 0, 0.31, 0.135, SADDLE, 10),
-      ball(0.19, 0.96, 1.12, 0.6, 0, 0.27, -0.1, 0xaec8ec),
-      ball(0.19, 0.88, 1.05, 0.6, 0, 0.27, -0.113, SNOW),
-      ball(0.235, 1, 0.95, 1, 0, 0.69, 0, NAVY, 12),
-      ball(0.235, 1.03, 0.5, 1.03, 0, 0.78, 0.01, CAP, 12),
-      cone(0.045, 0.12, 0.35, 0, 0.93, 0.03, CAP),
-      ball(0.17, 1.05, 0.9, 0.5, 0, 0.68, -0.155, SNOW),
-      ball(0.11, 0.45, 0.9, 1, -0.205, 0.655, -0.02, SNOW, 8),
-      ball(0.11, 0.45, 0.9, 1, 0.205, 0.655, -0.02, SNOW, 8),
-      ball(0.045, 1, 0.7, 0.5, -0.125, 0.645, -0.2, 0xff9db5, 6),
-      ball(0.045, 1, 0.7, 0.5, 0.125, 0.645, -0.2, 0xff9db5, 6),
-      ball(0.03, 1, 1, 1, -0.085, 0.73, -0.222, 0x10162e, 6),
-      ball(0.03, 1, 1, 1, 0.085, 0.73, -0.222, 0x10162e, 6),
-      cone(0.055, 0.14, -Math.PI / 2, 0, 0.655, -0.27, BEAK),
-      cone(0.07, 0.16, Math.PI * 0.62, 0, 0.12, 0.22, NAVY),
-      ball(0.095, 1.05, 0.4, 1.5, -0.1, 0.035, -0.07, FOOT, 8),
-      ball(0.095, 1.05, 0.4, 1.5, 0.1, 0.035, -0.07, FOOT, 8)
+      ball(0.24, 1, 1.25, 0.95, 0, 0.32, 0, NAVY, 12),
+      ball(0.2, 0.8, 0.95, 0.5, 0, 0.36, 0.14, 0x3a5bb5, 10),
+      ball(0.2, 0.96, 1.19, 0.6, 0, 0.3, -0.106, 0xaec8ec),
+      ball(0.2, 0.88, 1.12, 0.6, 0, 0.3, -0.12, SNOW),
+      ball(0.19, 1, 1, 1, 0, 0.67, 0, NAVY, 12),
+      ball(0.19, 1.03, 0.55, 1.03, 0, 0.74, 0.01, CAP, 12),
+      cone(0.04, 0.11, 0.35, 0, 0.87, 0.03, CAP),
+      ball(0.14, 1.05, 0.9, 0.5, 0, 0.66, -0.125, SNOW),
+      ball(0.04, 1, 0.7, 0.5, -0.105, 0.63, -0.168, 0xff9db5, 6),
+      ball(0.04, 1, 0.7, 0.5, 0.105, 0.63, -0.168, 0xff9db5, 6),
+      ball(0.026, 1, 1, 1, -0.07, 0.71, -0.185, 0x10162e, 6),
+      ball(0.026, 1, 1, 1, 0.07, 0.71, -0.185, 0x10162e, 6),
+      cone(0.05, 0.13, -Math.PI / 2, 0, 0.64, -0.23, BEAK),
+      cone(0.07, 0.16, Math.PI * 0.62, 0, 0.14, 0.24, NAVY),
+      ball(0.08, 1.05, 0.4, 1.5, -0.1, 0.03, -0.06, FOOT, 8),
+      ball(0.08, 1.05, 0.4, 1.5, 0.1, 0.03, -0.06, FOOT, 8)
     ]),
     limbs: merge([
-      ball(0.125, 0.3, 1, 0.62, -0.24, 0.31, 0, NAVY, 8),
-      ball(0.125, 0.3, 1, 0.62, 0.24, 0.31, 0, NAVY, 8),
-      ball(0.07, 0.3, 0.7, 0.7, -0.247, 0.23, 0, SADDLE, 6),
-      ball(0.07, 0.3, 0.7, 0.7, 0.247, 0.23, 0, SADDLE, 6)
+      ball(0.13, 0.3, 1.05, 0.62, -0.255, 0.36, 0, NAVY, 8),
+      ball(0.13, 0.3, 1.05, 0.62, 0.255, 0.36, 0, NAVY, 8),
+      ball(0.07, 0.3, 0.7, 0.7, -0.262, 0.27, 0, 0x3a5bb5, 6),
+      ball(0.07, 0.3, 0.7, 0.7, 0.262, 0.27, 0, 0x3a5bb5, 6)
     ]),
-    // Knitted scarf: a chunky striped ring, a striped tail down the back and a tassel
+    // Knitted scarf: a striped ring, a striped tail down the back and a tassel
     scarf: merge([
-      ball(0.215, 1, 0.34, 1, 0, 0.5, 0, SNOW, 12),
-      ball(0.21, 1, 0.1, 1, 0, 0.532, 0, GREY, 12),
-      ball(0.21, 1, 0.1, 1, 0, 0.468, 0, GREY, 12),
-      ball(0.075, 0.8, 0.75, 0.5, 0.07, 0.45, 0.2, SNOW, 6),
-      ball(0.075, 0.8, 0.75, 0.5, 0.07, 0.37, 0.215, GREY, 6),
-      ball(0.075, 0.8, 0.75, 0.5, 0.07, 0.29, 0.225, SNOW, 6),
-      ball(0.024, 1, 1.6, 1, 0.04, 0.215, 0.23, GREY, 5), ball(0.024, 1, 1.6, 1, 0.07, 0.21, 0.232, GREY, 5), ball(0.024, 1, 1.6, 1, 0.1, 0.215, 0.23, GREY, 5)
+      ball(0.205, 1, 0.3, 1, 0, 0.535, 0, SNOW, 12),
+      ball(0.2, 1, 0.09, 1, 0, 0.562, 0, GREY, 12),
+      ball(0.2, 1, 0.09, 1, 0, 0.508, 0, GREY, 12),
+      ball(0.065, 0.8, 0.75, 0.5, 0.06, 0.5, 0.2, SNOW, 6),
+      ball(0.065, 0.8, 0.75, 0.5, 0.06, 0.43, 0.215, GREY, 6),
+      ball(0.065, 0.8, 0.75, 0.5, 0.06, 0.36, 0.225, SNOW, 6),
+      ball(0.022, 1, 1.6, 1, 0.03, 0.29, 0.23, GREY, 5), ball(0.022, 1, 1.6, 1, 0.06, 0.285, 0.232, GREY, 5), ball(0.022, 1, 1.6, 1, 0.09, 0.29, 0.23, GREY, 5)
     ])
   },
-  // Crab faces +z (towards the camera): low and wide with big pincers, so its outline never reads as a penguin.
+  // Crab faces +z (towards the camera): spotted shell with a darker rim, eyes on stalks, jointed legs, pincers that open.
   crab: {
     body: merge([
-      ball(0.24, 1.58, 0.34, 1.02, 0, 0.16, 0, CRAB_D, 12),
-      ball(0.24, 1.5, 0.5, 0.95, 0, 0.19, 0, CRAB, 12),
-      ball(0.05, 1.3, 0.4, 1, -0.13, 0.3, -0.04, 0xff8a94, 6), ball(0.05, 1.2, 0.4, 1, 0.14, 0.298, -0.07, 0xff8a94, 6), ball(0.04, 1.2, 0.4, 1, 0.01, 0.308, -0.12, 0xff8a94, 6),
-      ball(0.03, 1, 2.2, 1, -0.11, 0.31, 0.1, CRAB, 6), ball(0.03, 1, 2.2, 1, 0.11, 0.31, 0.1, CRAB, 6),
-      ball(0.07, 1, 1, 1, -0.11, 0.41, 0.1, SNOW, 8), ball(0.07, 1, 1, 1, 0.11, 0.41, 0.1, SNOW, 8),
-      ball(0.034, 1, 1, 1, -0.11, 0.42, 0.158, 0x10162e, 6), ball(0.034, 1, 1, 1, 0.11, 0.42, 0.158, 0x10162e, 6),
+      ball(0.24, 1.38, 0.4, 1.02, 0, 0.17, 0, CRAB_D, 12),
+      ball(0.24, 1.3, 0.62, 0.95, 0, 0.21, 0, CRAB, 12),
+      ball(0.05, 1.3, 0.4, 1, -0.11, 0.343, -0.04, 0xff8a94, 6), ball(0.05, 1.2, 0.4, 1, 0.12, 0.34, -0.07, 0xff8a94, 6), ball(0.04, 1.2, 0.4, 1, 0.01, 0.352, -0.12, 0xff8a94, 6),
+      ball(0.03, 1, 2.2, 1, -0.1, 0.35, 0.1, CRAB, 6), ball(0.03, 1, 2.2, 1, 0.1, 0.35, 0.1, CRAB, 6),
+      ball(0.065, 1, 1, 1, -0.1, 0.44, 0.1, SNOW, 8), ball(0.065, 1, 1, 1, 0.1, 0.44, 0.1, SNOW, 8),
+      ball(0.032, 1, 1, 1, -0.1, 0.45, 0.155, 0x10162e, 6), ball(0.032, 1, 1, 1, 0.1, 0.45, 0.155, 0x10162e, 6),
       ...[-0.13, -0.01, 0.11].flatMap(z => [-1, 1].flatMap(sd => [
-        ball(0.04, 2, 0.75, 0.75, sd * 0.38, 0.13, z, CRAB_D, 6),
-        ball(0.035, 0.75, 2, 0.75, sd * 0.47, 0.065, z, CRAB_D, 6)
+        ball(0.04, 2, 0.75, 0.75, sd * 0.33, 0.14, z, CRAB_D, 6),
+        ball(0.035, 0.75, 2.1, 0.75, sd * 0.42, 0.07, z, CRAB_D, 6)
       ])),
-      ball(0.065, 1.7, 0.8, 0.8, -0.37, 0.25, 0.1, CRAB_D, 6), ball(0.065, 1.7, 0.8, 0.8, 0.37, 0.25, 0.1, CRAB_D, 6),
-      ball(0.15, 1.15, 0.5, 0.85, -0.5, 0.3, 0.16, CRAB_D, 8), ball(0.15, 1.15, 0.5, 0.85, 0.5, 0.3, 0.16, CRAB_D, 8)
+      ball(0.06, 1.6, 0.8, 0.8, -0.31, 0.26, 0.1, CRAB_D, 6), ball(0.06, 1.6, 0.8, 0.8, 0.31, 0.26, 0.1, CRAB_D, 6),
+      ball(0.1, 1.15, 0.5, 0.85, -0.4, 0.3, 0.15, CRAB_D, 8), ball(0.1, 1.15, 0.5, 0.85, 0.4, 0.3, 0.15, CRAB_D, 8)
     ]),
     limbs: merge([
-      ball(0.15, 1.15, 0.55, 0.85, -0.5, 0.42, 0.16, CRAB, 8),
-      ball(0.15, 1.15, 0.55, 0.85, 0.5, 0.42, 0.16, CRAB, 8)
+      ball(0.1, 1.15, 0.55, 0.85, -0.4, 0.385, 0.15, CRAB, 8),
+      ball(0.1, 1.15, 0.55, 0.85, 0.4, 0.385, 0.15, CRAB, 8)
     ])
   }
 };
@@ -117,7 +114,6 @@ class CrowdView {
     this.body = new THREE.InstancedMesh(MODELS[kind].body, mat(), max);
     this.limbs = new THREE.InstancedMesh(MODELS[kind].limbs, mat(), max);
     this.shadow = new THREE.InstancedMesh(shadowGeo, new THREE.MeshBasicMaterial({ color: 0x0a2a4a, transparent: true, opacity: 0.2, depthWrite: false }), max);
-    for (let i = 0; i < max; i++) { this.body.setColorAt(i, tmpCol.setScalar(1)); this.limbs.setColorAt(i, tmpCol); }
     this.meshes = [this.body, this.limbs, this.shadow];
     if (MODELS[kind].scarf) {
       this.scarf = new THREE.InstancedMesh(MODELS[kind].scarf, mat(), max);
@@ -134,9 +130,6 @@ class CrowdView {
       const a = Math.random() * 6.283;
       this.ox[i] = Math.cos(a) * 0.3; this.oz[i] = Math.sin(a) * 0.3; this.ph[i] = Math.random() * 6.283;
       this.sc[i] = 0.2; this.sz[i] = 0.84 + Math.random() * 0.36;
-      // Each one is a slightly different shade, so neighbours separate even when packed tightly
-      tmpCol.setScalar(0.72 + Math.random() * 0.28);
-      this.body.setColorAt(i, tmpCol); this.limbs.setColorAt(i, tmpCol);
       if (this.scarf) this.scarf.setColorAt(i, SCARVES[Math.floor(Math.random() * SCARVES.length)]);
     }
     this.n = n;
@@ -150,7 +143,6 @@ class CrowdView {
   removeAt(i) {
     const l = this.n - 1;
     this.ox[i] = this.ox[l]; this.oz[i] = this.oz[l]; this.ph[i] = this.ph[l]; this.sc[i] = this.sc[l]; this.sz[i] = this.sz[l];
-    this.body.getColorAt(l, tmpCol); this.body.setColorAt(i, tmpCol); this.limbs.setColorAt(i, tmpCol);
     if (this.scarf) { this.scarf.getColorAt(l, tmpCol); this.scarf.setColorAt(i, tmpCol); }
     this.n = l;
   }
@@ -206,7 +198,6 @@ class CrowdView {
     dummy.scale.set(1, 1, 1);
     for (const m of this.meshes) { m.count = this.n; m.instanceMatrix.needsUpdate = true; }
     this.shadow.visible = !Q.shadows;
-    this.body.instanceColor.needsUpdate = this.limbs.instanceColor.needsUpdate = true;
     if (this.scarf) this.scarf.instanceColor.needsUpdate = true;
   }
 }

@@ -142,7 +142,7 @@ function step(dt) {
       g.done = true;
       const pick = G.x < 0 ? g.left : g.right, other = G.x < 0 ? g.right : g.left;
       G.count = applyOp(G.count, pick.g);
-      pick.mesh.visible = false; other.mesh.visible = false;
+      pick.mesh.visible = false; other.mesh.material.opacity = 0.25;
       floater(pick.g.op + pick.g.v, !pick.g.good);
       if (pick.g.good) { Sfx.good(); player.jump = 1; } else { Sfx.bad(); player.flinch = 1; }
       sync();
@@ -212,22 +212,12 @@ function frame(dt) {
   Fx.update(dt);
   for (const f of foes) if (!f.dead) f.view.update(dt, G.t);
 
-  const r = player.radius, far = portrait ? 1.12 : 1, menu = G.state === 'menu';
-  // Lower and closer than before: penguins sit in the bottom third, the next gate mid-screen, the horizon in the top third.
-  const tx = G.x * 0.45, ty = (5.9 + r * 0.8) * far, tz = G.z + (8.8 + r * 1.3) * far;
+  const r = player.radius, far = portrait ? 1.25 : 1, menu = G.state === 'menu';
+  const tx = G.x * 0.45, ty = (7.5 + r * 0.9) * far, tz = G.z + (10 + r * 1.3) * far;
   const k = 1 - Math.exp(-dt * 6);
   camPos.x += (tx - camPos.x) * k; camPos.y += (ty - camPos.y) * k; camPos.z += (tz - camPos.z) * k;
   camera.position.copy(camPos);
-  camera.lookAt(tx, menu ? -4 : portrait ? 5.5 : 1.3, G.z - 11);
-
-  // Only the next gate is shown at full strength; the ones behind it stay faint until their turn comes.
-  let next = true;
-  for (const g of gates) {
-    if (g.done) continue;
-    const want = next ? 1 : 0.3, fade = Math.min(1, dt * 5);
-    next = false;
-    for (const side of [g.left, g.right]) side.mesh.material.opacity += (want - side.mesh.material.opacity) * fade;
-  }
+  camera.lookAt(tx, menu ? -4.5 : 0, G.z - 8);
 
   used = 0;
   if (G.count > 0) tag(G.x, 2.9, G.z, String(G.count), 'me');
