@@ -1,7 +1,7 @@
 /* Layout: full-bleed 3D stage; HUD pinned to the top edge, panels docked at the bottom. Single committed look. */
 :root {
   --sky-top: #3f9be0;
-  --sky-low: #e3f4fb;
+  --sky-low: #d4ecf9;
   --ink: #1c2541;
   --paper: #fff8e7;
   --sun: #ffd23f;
@@ -29,10 +29,12 @@ body {
 #app {
   position: relative; height: 100%; overflow: hidden;
   background:
-    radial-gradient(circle at 76% 22%, rgba(255, 251, 226, .98) 0 3%, rgba(255, 251, 226, .4) 4.5%, rgba(255, 251, 226, 0) 17%),
-    linear-gradient(var(--sky-top), var(--sky-low) 48%);
+    radial-gradient(ellipse 70% 55% at 12% -8%, rgba(255, 248, 222, .6), rgba(255, 248, 222, 0) 70%),
+    linear-gradient(var(--sky-top), var(--sky-low) 46%);
 }
 #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+/* Soft darkening towards the corners keeps the eye on the crowd in the lower middle */
+#vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 85% 80% at 50% 62%, rgba(18, 38, 80, 0) 55%, rgba(18, 38, 80, .26) 100%); }
 #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .gutter {
   padding-left: max(16px, env(safe-area-inset-left, 0px));

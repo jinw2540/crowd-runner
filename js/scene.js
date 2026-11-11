@@ -10,16 +10,19 @@ function canvasTex(w, h, draw) {
   t.encoding = THREE.sRGBEncoding;
   return t;
 }
+// Gates use the two most saturated colours on screen (green and red) and neither appears in the scenery.
 function gateTex(g) {
   return canvasTex(256, 164, (ctx, w, h) => {
-    ctx.fillStyle = g.good ? 'rgba(47,155,255,.8)' : 'rgba(255,84,70,.8)';
+    ctx.fillStyle = g.good ? 'rgba(26,178,98,.92)' : 'rgba(240,62,54,.92)';
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = 'rgba(255,248,231,.9)'; ctx.lineWidth = 10;
-    ctx.strokeRect(5, 5, w - 10, h - 10);
-    ctx.font = "104px Jua, 'Noto Sans KR', sans-serif";
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff8e7';
-    ctx.fillText(g.op + g.v, w / 2, h / 2 + 8, w - 30);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 14;
+    ctx.strokeRect(7, 7, w - 14, h - 14);
+    ctx.font = "122px Jua, 'Noto Sans KR', sans-serif";
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = g.good ? '#0b5a32' : '#84160f'; ctx.lineWidth = 12;
+    ctx.strokeText(g.op + g.v, w / 2, h / 2 + 9, w - 44);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(g.op + g.v, w / 2, h / 2 + 9, w - 44);
   });
 }
 
@@ -115,10 +118,10 @@ function box(w, h, d, color, x, y, z) {
 }
 function flag(x, y, z, dir) {
   const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, y, 6), lam(0x1c2541));
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, y, 8), lam(0x1c2541));
   pole.position.y = y / 2;
   const cloth = new THREE.Mesh(FLAG_GEO, new THREE.MeshLambertMaterial({ color: C(0xe5383b), side: THREE.DoubleSide }));
-  cloth.position.y = y - 0.3; cloth.scale.x = dir;
+  cloth.position.y = y - 0.24; cloth.scale.set(dir * 0.7, 0.7, 1);
   const knob = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), lam(0xffc21a));
   knob.position.y = y + 0.05;
   g.add(pole, cloth, knob);
@@ -151,22 +154,24 @@ function buildLevel() {
 
   // The road is a long ice floe: glossy cracked ice on top, a teal ledge at the waterline, foam where it meets the sea
   const roadTex = canvasTex(256, 256, (ctx, w, h) => {
-    ctx.fillStyle = '#cfe9f7'; ctx.fillRect(0, 0, w, h);
+    const across = ctx.createLinearGradient(0, 0, w, 0);
+    across.addColorStop(0, '#c2e0f2'); across.addColorStop(0.5, '#eef8fe'); across.addColorStop(1, '#c2e0f2');
+    ctx.fillStyle = across; ctx.fillRect(0, 0, w, h);
     const r = mulberry32(99);
-    ctx.fillStyle = 'rgba(255,255,255,.6)';
-    for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.ellipse(r() * w, r() * h, 20 + r() * 40, 8 + r() * 14, r() * 3, 0, 6.3); ctx.fill(); }
-    ctx.strokeStyle = '#9fcfe8'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
-    for (let i = 0; i < 7; i++) {
+    ctx.fillStyle = 'rgba(255,255,255,.3)';
+    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(r() * w, r() * h, 24 + r() * 40, 8 + r() * 12, r() * 3, 0, 6.3); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(150,200,228,.55)'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+    for (let i = 0; i < 3; i++) {
       let x = r() * w, y = r() * h;
       ctx.beginPath(); ctx.moveTo(x, y);
-      for (let k = 0; k < 4; k++) { x += (r() - 0.5) * 70; y += (r() - 0.5) * 70; ctx.lineTo(x, y); }
+      for (let k = 0; k < 3; k++) { x += (r() - 0.5) * 70; y += (r() - 0.5) * 70; ctx.lineTo(x, y); }
       ctx.stroke();
     }
   });
   roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping;
   roadTex.repeat.set(1, L / 10);
   const road = flat(new THREE.Mesh(new THREE.PlaneGeometry(W * 2, L),
-    new THREE.MeshPhongMaterial({ map: roadTex, shininess: 90, specular: C(0x2a4f6c) })));
+    new THREE.MeshPhongMaterial({ map: roadTex, shininess: 90, specular: C(0x1c3548) })));
   road.rotation.x = -Math.PI / 2; road.position.z = midZ;
   levelGroup.add(road);
   levelGroup.add(box(W * 2 + 2, 1.4, L, 0xbfe3f6, 0, -0.71, midZ), box(W * 2 + 3.2, 0.5, L, TEAL, 0, SEA_Y - 0.08, midZ));
@@ -175,7 +180,7 @@ function buildLevel() {
     for (let y = 0; y < h; y++) {
       const reach = w * (0.55 + 0.25 * Math.sin(y / h * 6.283 * 2) + 0.12 * Math.sin(y / h * 6.283 * 5));
       const gr = ctx.createLinearGradient(0, 0, reach, 0);
-      gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(0.5, 'rgba(235,250,255,.55)'); gr.addColorStop(1, 'rgba(235,250,255,0)');
+      gr.addColorStop(0, 'rgba(255,255,255,.55)'); gr.addColorStop(0.5, 'rgba(235,250,255,.28)'); gr.addColorStop(1, 'rgba(235,250,255,0)');
       ctx.fillStyle = gr; ctx.fillRect(0, y, reach, 1);
     }
   });
@@ -187,38 +192,39 @@ function buildLevel() {
     foam.material.side = THREE.DoubleSide;
     levelGroup.add(foam);
   }
-  const lumps = Math.floor(L / 2.4) * 2;
+  const lumps = Math.floor(L / 3.6) * 2;
   scatter(new THREE.SphereGeometry(0.6, 7, 5), lam(0xffffff, true), lumps, (i, d) => {
     d.rotation.set(0, dr() * 6.283, 0);
-    d.position.set((i % 2 ? 1 : -1) * (W + 0.5 + (dr() - 0.5) * 0.3), 0.15, 20 - Math.floor(i / 2) * 2.4 - dr());
-    d.scale.set(0.8 + dr() * 0.7, 0.5 + dr() * 0.5, 0.8 + dr() * 0.9);
+    d.position.set((i % 2 ? 1 : -1) * (W + 0.5), 0.12, 20 - Math.floor(i / 2) * 3.6 - dr() * 0.6);
+    d.scale.set(1 + dr() * 0.2, 0.55 + dr() * 0.15, 1.5 + dr() * 0.3);
     return 0xffffff;
   });
 
   // Icebergs and flat floes drifting on the sea, each with foam and a glow of submerged ice around it
+  // Big icebergs stay far out so nothing tall competes with the penguins and the gate; near the road there are only low floes.
   const spots = [];
-  const bergs = Math.floor(L / 6), per = Math.ceil(bergs / BERGS.length);
+  const bergs = Math.floor(L / 13), per = Math.ceil(bergs / BERGS.length);
   BERGS.forEach((geo, gi) => scatter(geo, iceMat(), per, (i, d) => {
-    const n = i * BERGS.length + gi, sc = 2 + dr() * 6, sz = sc * (0.7 + dr() * 0.6);
+    const n = i * BERGS.length + gi, sc = 5 + dr() * 6, sz = sc * (0.8 + dr() * 0.4);
     d.rotation.set(0, dr() * 6.283, 0);
-    d.position.set((n % 2 ? 1 : -1) * (10 + Math.max(sc, sz) * 1.5 + dr() * 44), SEA_Y - 0.1, 30 - (n / bergs) * (L + 50));
-    d.scale.set(sc, sc * (0.6 + dr() * 0.9), sz);
-    spots.push([d.position.x, d.position.z, Math.max(sc, sz) * 1.5]);
+    d.position.set((n % 2 ? 1 : -1) * (30 + Math.max(sc, sz) + dr() * 38), SEA_Y - 0.1, 10 - (n / bergs) * (L + 60));
+    d.scale.set(sc, sc * (0.7 + dr() * 0.6), sz);
+    spots.push([d.position.x, d.position.z, Math.max(sc, sz) * 1.45]);
     return pickTint();
   }));
-  const floes = Math.floor(L / 5);
+  const floes = Math.floor(L / 7);
   scatter(FLOE, iceMat(), floes, (i, d) => {
-    const sx = 1.2 + dr() * 3.5, sz = 1.2 + dr() * 3.5;
+    const sx = 1.6 + dr() * 3, sz = 1.6 + dr() * 3;
     d.rotation.set(0, dr() * 6.283, 0);
-    d.position.set((i % 2 ? 1 : -1) * (9.5 + dr() * 42), SEA_Y + 0.12, 30 - (i / floes) * (L + 50));
+    d.position.set((i % 2 ? 1 : -1) * (11 + dr() * 34), SEA_Y + 0.12, 30 - (i / floes) * (L + 50));
     d.scale.set(sx, 1, sz);
-    spots.push([d.position.x, d.position.z, Math.max(sx, sz) * 1.55]);
+    spots.push([d.position.x, d.position.z, Math.max(sx, sz) * 1.5]);
     return pickTint();
   });
   const haloTex = canvasTex(128, 128, (ctx, w) => {
     const gr = ctx.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
-    gr.addColorStop(0, 'rgba(110,215,228,.75)'); gr.addColorStop(0.6, 'rgba(110,215,228,.6)');
-    gr.addColorStop(0.74, 'rgba(255,255,255,.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    gr.addColorStop(0, 'rgba(120,205,222,.42)'); gr.addColorStop(0.62, 'rgba(120,205,222,.32)');
+    gr.addColorStop(0.76, 'rgba(255,255,255,.4)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = gr; ctx.fillRect(0, 0, w, w);
   });
   const haloGeo = new THREE.CircleGeometry(1, 20); haloGeo.rotateX(-Math.PI / 2);
@@ -249,9 +255,9 @@ function buildLevel() {
         levelGroup.add(m);
         return { g, mesh: m };
       };
-      const mid = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3.5, 8), lam(0x1c2541));
+      const mid = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 3.5, 8), lam(0x1c2541));
       mid.position.set(0, 1.75, s.z);
-      levelGroup.add(mid, flag(-W, 4.1, s.z, -1), flag(W, 4.1, s.z, 1));
+      levelGroup.add(mid, flag(-W, 3.9, s.z, -1), flag(W, 3.9, s.z, 1));
       gates.push({ z: s.z, left: mk(s.left, -W / 2), right: mk(s.right, W / 2), done: false });
     } else if (s.kind === 'enemy') {
       addFoe(s.x, s.z, s.size, 110, false);
@@ -359,29 +365,29 @@ function waves(ctx, w, n, seed, styles, width) {
 }
 const SEA = 700, SEA_REP = 46, SHINE_REP = 29;
 const seaTex = canvasTex(256, 256, (ctx, w) => {
-  ctx.fillStyle = '#16659e'; ctx.fillRect(0, 0, w, w);
-  waves(ctx, w, 46, 11, ['rgba(92,170,222,.5)', 'rgba(9,66,116,.45)', 'rgba(60,140,200,.4)'], 3.5);
+  ctx.fillStyle = '#3d7fae'; ctx.fillRect(0, 0, w, w);
+  waves(ctx, w, 34, 11, ['rgba(120,178,214,.4)', 'rgba(40,98,146,.3)', 'rgba(96,158,200,.3)'], 3.5);
 });
-const shineTex = canvasTex(256, 256, (ctx, w) => waves(ctx, w, 30, 23, ['rgba(255,255,255,.55)', 'rgba(200,236,255,.4)'], 1.6));
+const shineTex = canvasTex(256, 256, (ctx, w) => waves(ctx, w, 20, 23, ['rgba(255,255,255,.3)', 'rgba(210,238,255,.22)'], 1.6));
 seaTex.wrapS = seaTex.wrapT = shineTex.wrapS = shineTex.wrapT = THREE.RepeatWrapping;
 seaTex.repeat.set(SEA_REP, SEA_REP); shineTex.repeat.set(SHINE_REP, SHINE_REP);
-const sea = new THREE.Mesh(new THREE.PlaneGeometry(SEA, SEA), new THREE.MeshPhongMaterial({ map: seaTex, shininess: 120, specular: C(0x6f9fc4) }));
+const sea = new THREE.Mesh(new THREE.PlaneGeometry(SEA, SEA), new THREE.MeshPhongMaterial({ map: seaTex, shininess: 120, specular: C(0x3f6f94) }));
 sea.rotation.x = -Math.PI / 2; sea.position.set(0, SEA_Y, -150); sea.receiveShadow = true;
 const shine = new THREE.Mesh(new THREE.PlaneGeometry(SEA, SEA), new THREE.MeshBasicMaterial({ map: shineTex, transparent: true, depthWrite: false }));
 shine.rotation.x = -Math.PI / 2; shine.position.set(0, SEA_Y + 0.015, -150);
 farGroup.add(sea, shine);
 {
   let g = new THREE.ConeGeometry(1, 1, 6, 1); g.translate(0, 0.5, 0); g = g.toNonIndexed();
-  const n = g.attributes.position.count, col = new Float32Array(n * 3), top = C(0xffffff), low = C(0xa9cfe9);
+  const n = g.attributes.position.count, col = new Float32Array(n * 3), top = C(0xe6f2fb), low = C(0xc3dcf0);
   for (let i = 0; i < n; i++) { const c = g.attributes.position.getY(i) > 0.5 ? top : low; col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.computeVertexNormals();
   const N = 30, r = mulberry32(4242);
-  const m = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, fog: false }), N);
+  const m = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), N);
   for (let i = 0; i < N; i++) {
     dummy.position.set(-300 + i * 20.7 + r() * 8, SEA_Y, -185 - r() * 35);
     dummy.rotation.set(0, r() * 6.283, 0);
-    dummy.scale.set(20 + r() * 20, 14 + r() * 30, 20 + r() * 20);
+    dummy.scale.set(24 + r() * 22, 7 + r() * 13, 24 + r() * 22);
     dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix);
   }
   dummy.scale.set(1, 1, 1); dummy.rotation.set(0, 0, 0);
@@ -393,7 +399,7 @@ const FLAKES = calm ? 0 : 260, flakePos = new Float32Array(FLAKES * 3);
 for (let i = 0; i < FLAKES; i++) { flakePos[i * 3] = (Math.random() - 0.5) * 44; flakePos[i * 3 + 1] = Math.random() * 16; flakePos[i * 3 + 2] = -50 + Math.random() * 56; }
 const flakeGeo = new THREE.BufferGeometry();
 flakeGeo.setAttribute('position', new THREE.BufferAttribute(flakePos, 3));
-const flakes = new THREE.Points(flakeGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.22, transparent: true, opacity: 0.9, fog: false, depthWrite: false }));
+const flakes = new THREE.Points(flakeGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.14, transparent: true, opacity: 0.6, fog: false, depthWrite: false }));
 flakes.frustumCulled = false;
 farGroup.add(flakes);
 function updateFar(dt, z, t, moving) {
@@ -404,8 +410,8 @@ function updateFar(dt, z, t, moving) {
   shineTex.offset.set(-drift * 0.02, -SHINE_REP * z / SEA - drift * 0.03);
   if (foamTex) foamTex.offset.y = drift * 0.04;
   waveFlags(drift);
-  sun.target.position.set(0, 0, z - 24);
-  sun.position.set(22, 40, z - 54);
+  sun.target.position.set(0, 0, z - 20);
+  sun.position.set(-20, 38, z + 14);
   sun.target.updateMatrixWorld();
   for (let i = 0; i < FLAKES; i++) {
     const o = i * 3;

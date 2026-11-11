@@ -9,12 +9,14 @@ try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true 
 catch (e) { fail(); throw e; }
 renderer.outputEncoding = THREE.sRGBEncoding;
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(new THREE.Color(0xe3f4fb).convertSRGBToLinear(), 60, 150);
+// Fog starts close so distant ice sinks into the sky colour and the foreground stays the clearest thing on screen.
+scene.fog = new THREE.Fog(new THREE.Color(0xd4ecf9).convertSRGBToLinear(), 34, 132);
 const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 300);
-// Warm low sun ahead and to the right; the sky fills shaded sides with blue.
-scene.add(new THREE.HemisphereLight(0xf4fbff, 0x86bdea, 0.78));
-const sun = new THREE.DirectionalLight(0xfff1d8, 0.7);
-sun.position.set(22, 40, -54);
+// Warm sun from behind the camera, up and to the left: it lights the penguins' backs and throws
+// their shadows forward. A weaker, bluer sky light keeps shaded sides readable but clearly darker.
+scene.add(new THREE.HemisphereLight(0xeaf6ff, 0x6a9fd6, 0.58));
+const sun = new THREE.DirectionalLight(0xffe9c6, 0.88);
+sun.position.set(-20, 38, 14);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.04;
