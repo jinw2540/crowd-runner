@@ -24,7 +24,19 @@ const Save = {
       }
     } catch (e) { /* storage unavailable: play without saving */ }
   },
-  store() { try { localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (e) { /* ignore */ } }
+  store() {
+    try { localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (e) { /* ignore */ }
+    if (typeof Account !== 'undefined') Account.push();
+  },
+  // Combine a server copy into the local one. Biggest value wins; coins are not added together.
+  merge(r) {
+    const d = this.data, n = v => Number.isFinite(v) ? v : 0;
+    for (const k of ['level', 'coins', 'upStart', 'upIncome']) d[k] = Math.max(d[k], n(r[k]));
+    for (const f of ['stars', 'best']) {
+      const o = r[f];
+      if (o && typeof o === 'object') for (const s of Object.keys(o)) d[f][s] = Math.max(d[f][s] || 0, n(o[s]));
+    }
+  }
 };
 Save.load();
 
