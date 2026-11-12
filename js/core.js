@@ -40,7 +40,7 @@ function mulberry32(a) {
 function applyOp(n, g) {
   switch (g.op) {
     case '+': return n + g.v;
-    case '×': return n * g.v;
+    case '×': return Math.floor(n * g.v);
     case '−': return Math.max(1, n - g.v);
     default: return Math.max(1, Math.ceil(n / g.v));
   }
@@ -57,18 +57,22 @@ function genLevel(level) {
   if (level >= 3) kinds.push('pit');
   if (level >= 5) kinds.push('slider');
   const segs = [];
-  let best = 1, mults = 0, tripled = false, last = '';
-  const good = () => {
-    if (mults < 4 && best >= 3 && best < 300 && rnd() < 0.45) {
-      mults++;
-      if (!tripled && rnd() < 0.2) { tripled = true; return { op: '×', v: 3, good: true }; }
-      return { op: '×', v: 2, good: true };
-    }
-    return { op: '+', v: Math.max(2, nice(best * rf(0.4, 1.4) + ri(1, 4))), good: true };
+  let best = 1, mults = 0, tripled = false, evils = 0, last = '';
+  // Additions scale with the crowd early on, then stay modest so counts do not run away
+  const plus = () => ({ op: '+', v: Math.max(2, nice(best < 300 ? best * rf(0.4, 1.4) + ri(1, 4) : best * rf(0.1, 0.35))), good: true });
+  const canTimes = () => best >= 3 && best < 5000 && (best >= 300 || mults < 6);
+  const times = () => {
+    mults++;
+    if (best >= 300) return { op: '×', v: 1.5, good: true };
+    if (!tripled && rnd() < 0.2) { tripled = true; return { op: '×', v: 3, good: true }; }
+    return { op: '×', v: 2, good: true };
   };
+  const good = () => canTimes() && rnd() < 0.3 ? times() : plus();
   const bad = () => rnd() < 0.6
     ? { op: '−', v: Math.max(1, nice(best * rf(0.2, 0.6))), good: false }
     : { op: '÷', v: 2, good: false };
+  // How far apart the two results of a contested pair are on the best route: 10-25% either way
+  const near = () => rnd() < 0.5 ? rf(0.75, 0.9) : rf(1.1, 1.25);
 
   for (let i = 0; i < n; i++) {
     let kind = 'gate';
@@ -79,20 +83,19 @@ function genLevel(level) {
     }
     const z = -(30 + i * SEG);
     if (kind === 'gate') {
-      const a = good();
-      let b;
-      if (rnd() < 0.7) {
-        // Contested pair: both gates help, and on the best route their results differ by only 10-25%,
-        // so the right answer depends on how many penguins the player actually has.
-        const near = () => rnd() < 0.5 ? rf(0.75, 0.9) : rf(1.1, 1.25);
-        if (a.op === '×') b = { op: '+', v: Math.max(2, nice(best * (a.v - 1) * near())), good: true };
-        else if (mults < 4 && best >= 3 && best < 300 && rnd() < 0.5) {
-          mults++;
-          a.v = Math.max(2, nice(best * near()));   // an addition worth about as much as doubling
-          b = { op: '×', v: 2, good: true };
-        } else b = { op: '+', v: Math.max(2, nice(a.v * near())), good: true };
-        if (a.op === b.op && a.v === b.v) b.v += a.v > 40 ? 10 : a.v > 15 ? 5 : 1;
-      } else b = bad();
+      // A contested pair never offers the same operation twice (the bigger number would simply win).
+      // It is either add-versus-multiply or subtract-versus-divide, where the better gate depends on
+      // how many penguins the player has at that moment.
+      let a, b;
+      const contested = rnd() < 0.7;
+      if (contested && canTimes()) {
+        b = times();
+        a = { op: '+', v: Math.max(2, nice(best * (b.v - 1) * near())), good: true };
+      } else if (contested && best >= 8 && evils < 3) {
+        evils++;
+        a = { op: '÷', v: 2, good: false };
+        b = { op: '−', v: Math.max(1, nice(best * 0.5 * near())), good: false };
+      } else { a = good(); b = bad(); }
       best = Math.max(applyOp(best, a), applyOp(best, b));
       const flip = rnd() < 0.5;
       segs.push({ kind, z, left: flip ? b : a, right: flip ? a : b });
