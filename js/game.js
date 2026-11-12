@@ -3,7 +3,7 @@
 'use strict';
 
 /* ---------- Game state ---------- */
-const G = { state: 'menu', stage: Save.data.level, nextStage: Save.data.level, count: 1, x: 0, lastX: 0, z: 0, t: 0, fight: null, bigHit: 0, endTimer: 0, pending: null, walkFrom: 0 };
+const G = { state: 'menu', stage: Save.data.level, nextStage: Save.data.level, count: 1, x: 0, lastX: 0, z: 0, t: 0, fight: null, bigHit: 0, short: 0, mode: 'stage', endTimer: 0, pending: null, walkFrom: 0 };
 const player = new CrowdView('penguin');
 scene.add(player.group);
 const keys = { l: false, r: false };
@@ -16,7 +16,7 @@ const costIncome = () => Math.round(40 * Math.pow(1.5, Save.data.upIncome));
 function sync() { player.setValue(G.count); }
 function resetRun() {
   G.count = startCount(); G.x = 0; G.lastX = 0; G.z = 0; G.fight = null; G.pending = null;
-  player.cx = 0; player.cz = 0; player.hop = 1; G.bigHit = 0;
+  player.cx = 0; player.cz = 0; player.hop = 1; G.bigHit = 0; G.short = 0;
   player.resetImpact(); Combat.reset();
   player.setValue(G.count, { instant: true });
   camPos.set(0, 9, 12);
@@ -33,20 +33,30 @@ function refreshUI() {
   $('upIncomeCost').textContent = '코인 ' + costIncome();
   $('upIncome').disabled = d.coins < costIncome();
   $('mute').textContent = d.muted ? '소리 끔' : '소리 켬';
+  const a = Account;
+  $('acct').hidden = !a.enabled;
+  $('signIn').hidden = !!a.user && !a.user.is_anonymous;
+  $('nickChip').hidden = $('signOut').hidden = !a.user;
+  $('nickChip').textContent = a.nickname || '닉네임 없음';
+  if (typeof OnlineUI !== 'undefined') OnlineUI.refresh();
 }
 function toMenu() {
+  if (typeof Endless !== 'undefined') Endless.exit();
   G.stage = Save.data.level;
   buildLevel(); resetRun();
   G.state = 'menu';
-  $('menu').hidden = false; $('hud').hidden = true; $('result').hidden = true; $('map').hidden = true;
+  $('menu').hidden = false; $('hud').hidden = true; $('result').hidden = true; $('map').hidden = true; $('ranking').hidden = true;
   refreshUI();
 }
 function startRun(rebuild) {
+  if (typeof Endless !== 'undefined' && G.mode === 'endless') Endless.exit();
+  G.mode = 'stage';
   if (rebuild) { buildLevel(); resetRun(); }
   G.state = 'running';
   $('menu').hidden = true; $('hud').hidden = false; $('result').hidden = true; $('map').hidden = true;
   refreshUI();
 }
+const closeCall = boss => Math.max(5, Math.round(boss * 0.15));
 function finish(won, reason) {
   if (G.state !== 'running') return;
   const d = Save.data;
@@ -54,7 +64,7 @@ function finish(won, reason) {
   if (won) {
     const replay = G.stage < d.level, st = starsFor(G.count, level);
     gain = Math.round((20 + G.stage * 6 + Math.min(G.count, 500) * 0.3) * incomeMult() * (replay ? 0.5 : 1));
-    G.pending = { title: '스테이지 ' + G.stage + ' 클리어', text: G.count.toLocaleString('ko-KR') + '명이 살아남았어요.', main: '다음 스테이지', stars: st, replay };
+    G.pending = { title: '스테이지 ' + G.stage + ' 클리어', text: (G.count <= closeCall(level.boss) ? '아슬아슬했어요! ' : '') + G.count.toLocaleString('ko-KR') + '명이 살아남았어요.', main: '다음 스테이지', stars: st, replay };
     d.stars[G.stage] = Math.max(d.stars[G.stage] || 0, st);
     d.best[G.stage] = Math.max(d.best[G.stage] || 0, G.count);
     if (!replay) d.level++;
@@ -65,7 +75,9 @@ function finish(won, reason) {
   } else {
     const progress = clamp(G.z / level.bossZ, 0, 1);
     gain = Math.round((3 + progress * 10) * incomeMult());
-    G.pending = { title: reason, text: '업그레이드로 시작 인원을 늘리면 더 쉬워져요.', main: '다시 도전', stars: 0 };
+    const tip = '업그레이드로 시작 인원을 늘리면 더 쉬워져요.';
+    const text = G.short ? (G.short <= closeCall(level.boss) ? '아깝다! ' : '') + G.short.toLocaleString('ko-KR') + '마리만 더 있었으면 이겼어요. ' + tip : tip;
+    G.pending = { title: reason, text, main: '다시 도전', stars: 0 };
     G.nextStage = G.stage; G.walkFrom = 0;
     Sfx.lose();
   }
@@ -125,6 +137,7 @@ function hitHazard(h, x, z) {
 }
 
 function step(dt) {
+  if (G.mode === 'endless') { Endless.step(dt); return; }
   G.t += dt;
   for (const h of hazards) {
     if (h.type === 'spinner') { h.ang += dt * 2.3 * h.side; h.mesh.rotation.y = h.ang; }
@@ -186,19 +199,20 @@ function step(dt) {
       }
       if (!G.fight && gap < player.radius + f.view.radius + 0.8) {
         G.fight = f; f.acc = 0; f.view.hop = 1;
+        f.tense = f.isBoss && Math.abs(G.count - f.size) <= closeCall(f.size) ? Math.max(4, Math.round(Math.min(G.count, f.size) * .08)) : 0;
         f.rate = Math.max(12, Math.min(G.count, f.size) / (f.isBoss ? 1.5 : 0.8));
         Combat.begin(player, f.view);
       }
     }
     const f = G.fight;
     if (f) {
-      f.acc += f.rate * dt;
+      f.acc += f.rate * dt * (Math.min(G.count, f.size) <= f.tense ? .22 : 1);
       const k = Math.min(Math.floor(f.acc), G.count, f.size);
       if (k > 0) { f.acc -= k; G.count -= k; f.size -= k; Combat.damage(player, f.view, k); }
       f.view.cx += (G.x - f.view.cx) * Math.min(1, dt * 4);
       f.view.setValue(f.size);
       sync();
-      if (G.count <= 0) { finish(false, f.isBoss ? '보스 무리가 더 많았어요' : '모두 쓰러졌어요'); return; }
+      if (G.count <= 0) { G.short = f.isBoss ? f.size + 1 : 0; finish(false, f.isBoss ? '보스 무리가 더 많았어요' : '모두 쓰러졌어요'); return; }
       if (f.size <= 0) {
         Combat.finish(player, f.view);
         f.dead = true; f.view.group.visible = false; G.fight = null;
@@ -213,7 +227,7 @@ function step(dt) {
 /* ---------- Camera and frame ---------- */
 const camPos = new THREE.Vector3(0, 9, 12);
 function frame(dt) {
-  step(dt);
+  step(dt); dt = Math.min(dt, .05);
   const run = G.state === 'running';
   player.mode = run ? 'run' : G.state === 'win' ? 'cheer' : 'idle';
   if (!run) player.tiltT = 0;
@@ -244,8 +258,9 @@ function frame(dt) {
     tag(f.view.cx, f.view.tall * 1.6 + 1.4, f.view.cz, String(f.size), 'foe', G.fight === f ? 50 : 0);
   }
   for (let i = used; i < pool.length; i++) pool[i].hidden = true;
-  if (G.state === 'running') $('barFill').style.width = (clamp(G.z / level.bossZ, 0, 1) * 100).toFixed(1) + '%';
+  if (G.state === 'running' && G.mode !== 'endless') $('barFill').style.width = (clamp(G.z / level.bossZ, 0, 1) * 100).toFixed(1) + '%';
 
+  if (G.mode === 'endless') EndlessScene.animate(G.t, G.z);
   updateFar(dt, G.z, G.t, G.state === 'running' && !G.fight);
   renderer.render(scene, camera);
 }
@@ -256,7 +271,7 @@ function loop(now) {
     Q.slow = raw > 0.034 ? Q.slow + Math.min(raw, 0.1) : Math.max(0, Q.slow - raw);
     if (Q.slow > 2.5) setShadows(false);
   }
-  frame(dt);
+  frame(G.mode === 'endless' ? raw : dt);
   requestAnimationFrame(loop);
 }
 

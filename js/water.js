@@ -4,14 +4,16 @@
 'use strict';
 scope.createStylizedWater = function (T, seaY) {
   const linear = hex => new T.Color(hex).convertSRGBToLinear();
-  const time = { value: 0 };
+  const time = { value: 0 }, origin = { value: 0 };
   const waveGLSL = `
-    uniform float uWaterTime;
+    uniform float uWaterTime; uniform float uWaterOrigin;
     float waterHeight(vec2 p) {
+      p.y += uWaterOrigin;
       return .055 * sin(dot(p, vec2(.24, .15)) + uWaterTime * .72)
            + .034 * sin(dot(p, vec2(-.12, .32)) - uWaterTime * .57);
     }
     vec2 waterSlope(vec2 p) {
+      p.y += uWaterOrigin;
       vec2 slope = .055 * vec2(.24, .15) * cos(dot(p, vec2(.24, .15)) + uWaterTime * .72)
                  + .034 * vec2(-.12, .32) * cos(dot(p, vec2(-.12, .32)) - uWaterTime * .57);
       slope += .11 * vec2(.85, .53) * sin(dot(p, vec2(1.28, .81)) + uWaterTime * 1.1);
@@ -20,7 +22,7 @@ scope.createStylizedWater = function (T, seaY) {
     }
   `;
   const material = new T.MeshPhongMaterial({ color: 0xffffff, shininess: 145, specular: linear(0x315463) });
-  const uniforms = { uWaterTime: time, uAqua: { value: linear(0x35bcc9) }, uHorizon: { value: linear(0x79c7de) } };
+  const uniforms = { uWaterTime: time, uWaterOrigin: origin, uAqua: { value: linear(0x35bcc9) }, uHorizon: { value: linear(0x79c7de) } };
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = 'varying vec3 vWaterWorld;\n' + waveGLSL + shader.vertexShader;
@@ -34,8 +36,8 @@ scope.createStylizedWater = function (T, seaY) {
     shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
       #include <color_fragment>
       float distanceTint = smoothstep(16.0, 145.0, length(cameraPosition.xz - vWaterWorld.xz));
-      float broadWave = sin(dot(vWaterWorld.xz, vec2(.19, .27)) + uWaterTime * .46)
-                      * cos(dot(vWaterWorld.xz, vec2(-.16, .11)) - uWaterTime * .31);
+      float broadWave = sin(dot(vWaterWorld.xz + vec2(0.0, uWaterOrigin), vec2(.19, .27)) + uWaterTime * .46)
+                      * cos(dot(vWaterWorld.xz + vec2(0.0, uWaterOrigin), vec2(-.16, .11)) - uWaterTime * .31);
       diffuseColor.rgb = mix(uAqua, uHorizon, distanceTint) * (1.0 + broadWave * .055);
     `);
     shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `
@@ -45,7 +47,7 @@ scope.createStylizedWater = function (T, seaY) {
     `);
     shader.fragmentShader = shader.fragmentShader.replace('#include <specularmap_fragment>', `
       #include <specularmap_fragment>
-      float brokenGlint = .5 + .5 * sin(dot(vWaterWorld.xz, vec2(.71, -.44)) + uWaterTime * .58);
+      float brokenGlint = .5 + .5 * sin(dot(vWaterWorld.xz + vec2(0.0, uWaterOrigin), vec2(.71, -.44)) + uWaterTime * .58);
       specularStrength *= .25 + .75 * brokenGlint * brokenGlint;
     `);
     material.userData.compiled = true;
@@ -135,6 +137,7 @@ scope.createStylizedWater = function (T, seaY) {
     });
     // UniformsUtils clones values; explicitly share the clock with the sea.
     foamMaterial.uniforms.uWaterTime = time;
+    foamMaterial.uniforms.uWaterOrigin = origin;
     for (const bin of chunks.values()) {
       const g = new T.BufferGeometry();
       g.setAttribute('position', new T.Float32BufferAttribute(bin.position, 3));
@@ -150,6 +153,6 @@ scope.createStylizedWater = function (T, seaY) {
     const c = Math.cos(angle), s = Math.sin(angle);
     return { phase, points: points.map(p => new T.Vector2(x + (p.x * c + p.y * s) * scale, z + (-p.x * s + p.y * c) * scale)) };
   }
-  return { mesh, uniforms, createContacts, outline, update: (t, reducedMotion) => { time.value = reducedMotion ? 0 : t; } };
+  return { mesh, uniforms, createContacts, outline, setOrigin: value => { origin.value = value; }, update: (t, reducedMotion) => { time.value = reducedMotion ? 0 : t; } };
 };
 })(typeof window !== 'undefined' ? window : globalThis);

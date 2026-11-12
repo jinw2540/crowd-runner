@@ -117,52 +117,25 @@ function flag(x, y, z, dir) {
   g.position.set(x, 0, z);
   return g;
 }
-function buildLevel() {
-  disposeLevel();
-  levelGroup = new THREE.Group(); scene.add(levelGroup);
-  gates = []; foes = []; hazards = [];
-  level = genLevel(G.stage);
-  const L = -level.bossZ + 50, midZ = -L / 2 + 20, dr = mulberry32(level.level * 31 + 7);
+function buildSegments(segments, group, items, dr) {
   const flat = m => { m.userData.ground = true; return m; };
-
-  // A single continuous snow-capped slab; the ten-unit playing lane stays flat.
-  const roadWidth = W * 2 + 2.6;
-  const road = IceEnvironment.road(roadWidth, L); road.position.z = midZ;
-  levelGroup.add(road);
-  // Spectators use the same rounded floes as the rest of the environment.
-  const reserved = [], men = Math.max(2, Math.floor(L / 65)), sr = mulberry32(level.level * 3001 + 41);
-  const spectatorRadius = IceEnvironment.radius('spectator') + .1, finishRadius = IceEnvironment.radius('finish') + .1;
-  for (let attempt = 0; reserved.length < men && attempt < men * 40; attempt++) {
-    const side = sr() < .5 ? -1 : 1, x = side * (W + 3 + spectatorRadius + sr() * 8), z = -(20 + sr() * (L - 78));
-    if (Math.hypot(x, z - level.bossZ) < spectatorRadius + finishRadius + 1.2) continue;
-    if (reserved.some(s => Math.hypot(x - s.x, z - s.z) < spectatorRadius + s.radius + 6)) continue;
-    const base = IceEnvironment.floe('spectator'); base.position.set(x, -.015, z);
-    const man = new THREE.Mesh(SNOWMAN, new THREE.MeshLambertMaterial({ vertexColors: true }));
-    man.position.set(x, 0, z); man.rotation.y = -side * .7 + (sr() - .5) * .6;
-    levelGroup.add(base, man); reserved.push({ x, z, radius: spectatorRadius });
-  }
-  // Separate scenery randomness from gates/hazard decoration, with a stable seed per stage.
-  iceScenery = IceEnvironment.driftField({ length: L, halfWidth: W, seaY: SEA_Y,
-    random: mulberry32(level.level * 6197 + 73), reserved: [...reserved, { x: 0, z: level.bossZ, radius: finishRadius }] });
-  levelGroup.add(iceScenery.root);
-
-  for (const s of level.segs) {
+  for (const s of segments) {
     if (s.kind === 'gate') {
       const mk = (g, x) => {
         const m = new THREE.Mesh(new THREE.PlaneGeometry(4.7, 3),
           new THREE.MeshBasicMaterial({ map: gateTex(g), transparent: true, depthWrite: false, side: THREE.DoubleSide }));
         m.position.set(x, 1.9, s.z);
-        levelGroup.add(m);
+        group.add(m);
         return { g, mesh: m };
       };
       const mid = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3.5, 8), lam(0x1c2541));
       mid.position.set(0, 1.75, s.z);
-      levelGroup.add(mid, flag(-W, 4.1, s.z, -1), flag(W, 4.1, s.z, 1));
-      gates.push({ z: s.z, left: mk(s.left, -W / 2), right: mk(s.right, W / 2), done: false });
+      group.add(mid, flag(-W, 4.1, s.z, -1), flag(W, 4.1, s.z, 1));
+      items.gates.push({ id: s.id, z: s.z, left: mk(s.left, -W / 2), right: mk(s.right, W / 2), done: false });
     } else if (s.kind === 'enemy') {
-      addFoe(s.x, s.z, s.size, 110, false);
+      const f = addFoe(s.x || 0, s.z, s.size, 110, !!s.boss, group, items.foes); f.id = s.id;
     } else {
-      const h = { type: s.type, z: s.z, side: s.side, ang: 0, x: 0 };
+      const h = { id: s.id, type: s.type, z: s.z, side: s.side, ang: 0, x: 0 };
       h.mesh = new THREE.Group();
       if (s.type === 'spinner') {
         // Spinning bar of icicles
@@ -208,10 +181,43 @@ function buildLevel() {
         for (let k = 0; k < 4; k++) slab((dr() - 0.5) * 3, (dr() - 0.5) * 2.5, false);
         h.mesh.position.set(h.x, 0, s.z);
       }
-      levelGroup.add(h.mesh);
-      hazards.push(h);
+      group.add(h.mesh);
+      items.hazards.push(h);
     }
   }
+
+}
+
+function buildLevel() {
+  disposeLevel();
+  levelGroup = new THREE.Group(); scene.add(levelGroup);
+  gates = []; foes = []; hazards = [];
+  level = genLevel(G.stage);
+  const L = -level.bossZ + 50, midZ = -L / 2 + 20, dr = mulberry32(level.level * 31 + 7);
+  const flat = m => { m.userData.ground = true; return m; };
+
+  // A single continuous snow-capped slab; the ten-unit playing lane stays flat.
+  const roadWidth = W * 2 + 2.6;
+  const road = IceEnvironment.road(roadWidth, L); road.position.z = midZ;
+  levelGroup.add(road);
+  // Spectators use the same rounded floes as the rest of the environment.
+  const reserved = [], men = Math.max(2, Math.floor(L / 65)), sr = mulberry32(level.level * 3001 + 41);
+  const spectatorRadius = IceEnvironment.radius('spectator') + .1, finishRadius = IceEnvironment.radius('finish') + .1;
+  for (let attempt = 0; reserved.length < men && attempt < men * 40; attempt++) {
+    const side = sr() < .5 ? -1 : 1, x = side * (W + 3 + spectatorRadius + sr() * 8), z = -(20 + sr() * (L - 78));
+    if (Math.hypot(x, z - level.bossZ) < spectatorRadius + finishRadius + 1.2) continue;
+    if (reserved.some(s => Math.hypot(x - s.x, z - s.z) < spectatorRadius + s.radius + 6)) continue;
+    const base = IceEnvironment.floe('spectator'); base.position.set(x, -.015, z);
+    const man = new THREE.Mesh(SNOWMAN, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    man.position.set(x, 0, z); man.rotation.y = -side * .7 + (sr() - .5) * .6;
+    levelGroup.add(base, man); reserved.push({ x, z, radius: spectatorRadius });
+  }
+  // Separate scenery randomness from gates/hazard decoration, with a stable seed per stage.
+  iceScenery = IceEnvironment.driftField({ length: L, halfWidth: W, seaY: SEA_Y,
+    random: mulberry32(level.level * 6197 + 73), reserved: [...reserved, { x: 0, z: level.bossZ, radius: finishRadius }] });
+  levelGroup.add(iceScenery.root);
+
+  buildSegments(level.segs, levelGroup, { gates, foes, hazards }, dr);
 
   // Finish: a wide round floe for the boss group, with an igloo camp behind it
   const pad = IceEnvironment.floe('finish');
@@ -310,11 +316,11 @@ function updateFar(dt, z, t, moving) {
   if (FLAKES) flakeGeo.attributes.position.needsUpdate = true;
 }
 
-function addFoe(x, z, size, max, isBoss) {
+function addFoe(x, z, size, max, isBoss, group = levelGroup, list = foes) {
   const view = new CrowdView('crab');
   view.cx = x; view.cz = z; view.hop = 0.25;
   view.setValue(size, { instant: true });
-  levelGroup.add(view.group);
-  foes.push({ size, view, isBoss, dead: false, acc: 0, rate: 0 });
+  group.add(view.group);
+  const f = { size, view, isBoss, dead: false, acc: 0, rate: 0 }; list.push(f); return f;
 }
 

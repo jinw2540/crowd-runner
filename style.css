@@ -94,7 +94,8 @@ body {
 .dock { pointer-events: auto; width: 100%; max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px;
   background: var(--ink); border-radius: 24px; padding: 14px; box-shadow: 0 6px 0 rgba(0, 0, 0, .25); }
 .dock .chip { background: rgba(255, 248, 231, .12); }
-.dock-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.dock-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.acct { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .upgrades { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .up {
   cursor: pointer; text-align: left; border: 0; border-radius: 16px;
@@ -119,7 +120,7 @@ body {
 button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 
 /* Result */
-#result { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(28, 37, 65, .45); padding-block: 20px; }
+#result, #nick { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(28, 37, 65, .45); padding-block: 20px; }
 .card {
   width: 100%; max-width: 380px; background: var(--paper); border-radius: 26px;
   padding: 26px 22px 22px; display: flex; flex-direction: column; gap: 14px; text-align: center;
@@ -128,7 +129,7 @@ button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 .card h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 38px; line-height: 1.05; text-wrap: balance; }
 .card p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--muted); }
 .card .gain { font-family: var(--font-display); font-size: 26px; color: var(--ink); font-variant-numeric: tabular-nums; }
-.go-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.go-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; }
 .go-row .go.alt { font-size: 22px; padding-inline: 22px; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .stars { font-size: 34px; line-height: 1; letter-spacing: 4px; color: var(--sun-deep); }
@@ -192,3 +193,75 @@ button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 #fail { position: absolute; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; background: var(--ink); color: var(--paper); font-size: 16px; line-height: 1.6; }
 @media (prefers-reduced-motion: reduce) { .floater { animation-duration: .01s; } }
 
+/* Nickname card and ranking */
+#nick .card input {
+  font-family: var(--font-display); font-size: 24px; text-align: center; color: var(--ink);
+  background: #fff; border: 3px solid var(--ink); border-radius: 14px; padding: 10px 12px 9px; width: 100%; box-sizing: border-box;
+}
+#nick .card .err { color: var(--rival); font-weight: 700; }
+#ranking { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--sea-1); color: var(--paper); }
+.rank-msg { margin: 0; padding-block: 14px; font-size: 15px; line-height: 1.5; text-align: center; }
+#rankList { flex: 1; min-height: 0; overflow-y: auto; margin: 0; padding-block: 10px; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.rank-row, #rankMe {
+  display: grid; grid-template-columns: 2.4em 1fr auto auto; align-items: center; gap: 10px;
+  max-width: 480px; width: 100%; margin-inline: auto; box-sizing: border-box;
+  background: rgba(28, 37, 65, .55); border-radius: 14px; padding: 10px 14px 9px;
+  font-family: var(--font-display); font-size: 17px; font-variant-numeric: tabular-nums;
+}
+.rank-row b, #rankMe b { font-weight: 400; color: var(--sun); text-align: center; }
+.rank-row span:nth-child(2), #rankMe span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rank-row.me { background: var(--sun); color: var(--ink); }
+.rank-row.me b { color: var(--ink); }
+#rankMe { margin-block: 8px 14px; background: var(--ink); color: var(--paper); box-shadow: 0 4px 0 rgba(0, 0, 0, .25); }
+#rankMe[hidden] { display: none; }
+
+
+/* Endless mode and online records */
+.menu-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.menu-actions .go { padding-inline: 8px; }
+.menu-actions #openMap, .menu-actions #openRank { font-size: 18px; padding-block: 9px; }
+.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(28,37,65,.45); padding-block: 18px; box-sizing: border-box; overflow-y: auto; }
+.endless-card { max-width: 440px; gap: 14px; box-sizing: border-box; max-height: 100%; overflow: auto; }
+.eyebrow { color: #357b91; font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+.record-strip { display: grid; grid-template-columns: 1fr 1fr; border-radius: 16px; background: #e4f1ed; padding: 14px 8px; gap: 8px; }
+.record-strip small { display: block; color: var(--muted); font-size: 12px; }
+.record-strip b { display: block; font-family: var(--font-display); font-size: 28px; margin-top: 5px; font-weight: 400; }
+.card .daily-note { color: #286f88; font-weight: 700; }
+.card .rules-note { font-size: 12px; line-height: 1.7; }
+#endlessMessage { color: #9a3545; }
+#nick { z-index: 20; }
+#nick .card { box-sizing: border-box; }
+#endlessInfo { position: absolute; left: 0; right: 0; top: 62px; display: flex; gap: 8px; justify-content: space-between; pointer-events: none; color: var(--ink); font-size: 12px; }
+#endlessInfo span { background: rgba(255,248,231,.88); padding: 6px 10px; border-radius: 99px; }
+#pauseEndless { pointer-events: auto; }
+.score-chip { background: var(--sun); color: var(--ink); font-size: 22px; }
+#hud.endless-hud { flex-wrap: wrap; gap: 7px; }
+#hud.endless-hud #bar { display: none; }
+#hud.endless-hud #hStage { font-size: 13px; }
+#hud.endless-hud #hScore { margin-left: auto; }
+#endlessScore { font-size: 46px; color: #1e6e8b; }
+.score-breakdown { display: grid; gap: 10px; margin: 0; text-align: left; padding: 15px; background: #e4f1ed; border-radius: 16px; }
+.score-breakdown div { display: flex; justify-content: space-between; gap: 12px; }
+.score-breakdown dd { margin: 0; font-weight: 700; }
+.rank-tabs { display: flex; gap: 8px; justify-content: center; padding-block: 12px; }
+.rank-tabs .selected { background: var(--sun); color: var(--ink); }
+#ranking .map-head { flex-wrap: wrap; }
+#rankNote { font-size: 13px; }
+#rankMsg { color: var(--paper); }
+#rankGap { padding-block: 3px; color: var(--sun); }
+#rankMe { max-width: 520px; }
+.rank-row { max-width: 520px; }
+#accountMessage { color: #ffd892; }
+@media(max-width: 520px) {
+  .dock { box-sizing: border-box; }
+  .acct { width: 100%; justify-content: flex-end; }
+  .acct .pill, .acct .chip { font-size: 12px; }
+  #hud.endless-hud #hCoins { font-size: 13px; padding-inline: 8px; }
+  #hud.endless-hud #hStage { display: none; }
+  #hud.endless-hud #hScore { margin-left: 0; margin-right: auto; }
+  #hud.endless-hud #mute, #pauseEndless { padding: 8px; font-size: 12px; }
+  .rank-row, #rankMe { font-size: 14px; gap: 6px; padding-inline: 10px; }
+  .endless-card { padding: 20px 18px; gap: 11px; }
+  .endless-card h2 { font-size: 34px; }
+}
+@media(max-height: 660px) { #menu { padding-top: 28px; } #menu h1 { font-size: 60px; } .dock { gap: 8px; padding: 12px; } .endless-card { gap: 9px; } }

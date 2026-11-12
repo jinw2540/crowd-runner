@@ -3,7 +3,7 @@
 <title>뭉쳐 달려</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap">
-<link rel="stylesheet" href="style.css?v=aqua-1">
+<link rel="stylesheet" href="style.css?v=endless-1">
 
 <div id="app">
   <canvas id="stage"></canvas>
@@ -13,6 +13,8 @@
     <span class="chip" id="hStage">스테이지 1</span>
     <div id="bar" role="progressbar" aria-label="진행도"><div id="barFill"></div></div>
     <span class="chip coin" id="hCoins">0</span>
+    <span class="chip score-chip" id="hScore" hidden>0점</span>
+    <button class="pill" id="pauseEndless" type="button" hidden>일시정지</button>
     <button id="mute" type="button">소리 켬</button>
   </div>
 
@@ -22,6 +24,11 @@
       <div class="dock-head">
         <span class="chip" id="mStage">스테이지 1</span>
         <span class="chip coin" id="mCoins">0</span>
+        <div class="acct" id="acct" hidden>
+          <button class="pill" id="signIn" type="button">구글로 로그인</button>
+          <span class="chip" id="nickChip" hidden></span>
+          <button class="pill" id="signOut" type="button" hidden>로그아웃</button>
+        </div>
       </div>
       <div class="upgrades">
         <button class="up" id="upStart" type="button">
@@ -31,10 +38,13 @@
           <b>코인 수익</b><span id="upIncomeNow">보상 100%</span><span class="cost" id="upIncomeCost"></span>
         </button>
       </div>
-      <div class="go-row">
-        <button class="go" id="start" type="button">달리기</button>
+      <div class="menu-actions">
+        <button class="go" id="openEndless" type="button">무한 달리기</button>
+        <button class="go alt" id="start" type="button">스테이지</button>
         <button class="go alt" id="openMap" type="button">지도</button>
+        <button class="go alt" id="openRank" type="button">랭킹</button>
       </div>
+      <p id="accountMessage" class="hint" role="status" hidden></p>
       <p class="hint">좌우로 드래그하거나 ← → 키로 게이트를 고르세요</p>
     </div>
   </section>
@@ -51,6 +61,56 @@
         <button class="go alt" id="rMenu" type="button">업그레이드</button>
       </div>
     </div>
+  </section>
+
+  <section id="endlessMenu" class="gutter overlay" hidden>
+    <div class="card endless-card">
+      <span class="eyebrow">ENDLESS EXPEDITION</span>
+      <h2>얼음길 끝까지</h2>
+      <p>게이트를 고르고, 게를 물리치고.<br>오늘은 어디까지 갈 수 있을까요?</p>
+      <div class="record-strip"><div><small>내 연습 최고</small><b id="practiceBest">0점</b></div><div><small>내 랭킹 최고</small><b id="rankedBest">0점</b></div></div>
+      <p class="daily-note" id="dailyCourse"></p>
+      <p class="rules-note">모두 10명으로 출발 · 최대 9,999명<br>거리 1m +10 · 보스 +500 · 장애물 무피해 구간 +200</p>
+      <button class="go" id="startRanked" type="button">오늘의 랭킹 도전</button>
+      <button class="go alt" id="startPractice" type="button">연습으로 달리기</button>
+      <p id="endlessMessage" role="status" hidden></p>
+      <div class="two"><button class="pill" id="endlessRank" type="button">오늘의 랭킹</button><button class="pill" id="endlessBack" type="button">돌아가기</button></div>
+    </div>
+  </section>
+  <div id="endlessInfo" class="gutter" hidden><span id="endlessConnection">연습</span><span id="nextBoss"></span></div>
+  <section id="endlessPause" class="gutter overlay" hidden>
+    <div class="card"><h2>잠깐 쉬어가요</h2><p id="pauseText"></p><button class="go" id="resumeEndless" type="button">계속 달리기</button><button class="go alt" id="quitEndless" type="button">여기까지 기록하기</button></div>
+  </section>
+  <section id="endlessResult" class="gutter overlay" hidden>
+    <div class="card endless-card"><span class="eyebrow" id="endlessResultKind">나의 달리기</span><h2 id="endlessScore"></h2><p id="endlessReason"></p>
+      <dl class="score-breakdown"><div><dt>달린 거리</dt><dd id="resultDistance"></dd></div><div><dt>물리친 보스</dt><dd id="resultBosses"></dd></div><div><dt>무피해 구간</dt><dd id="resultClean"></dd></div></dl>
+      <p id="submitStatus" role="status"></p><button class="pill" id="retrySubmit" type="button" hidden>기록 등록 다시 시도</button>
+      <button class="go" id="againEndless" type="button">다시 달리기</button><div class="two"><button class="go alt" id="resultRank" type="button">랭킹</button><button class="go alt" id="endlessHome" type="button">메뉴</button></div>
+    </div>
+  </section>
+
+  <section id="nick" class="gutter" hidden>
+    <form class="card" id="nickForm">
+      <h2>닉네임 정하기</h2>
+      <p>랭킹에 보여줄 이름이에요. 2~12자로 정해 주세요.</p>
+      <input id="nickInput" type="text" minlength="2" maxlength="12" autocomplete="off" aria-label="닉네임">
+      <p id="nickErr" class="err" role="alert" hidden></p>
+      <button class="go" id="nickOk" type="submit">정했어요</button>
+      <button class="pill" id="nickLater" type="button">나중에</button>
+    </form>
+  </section>
+
+  <section id="ranking" hidden>
+    <header class="map-head gutter">
+      <button class="pill" id="rankBack" type="button">돌아가기</button>
+      <h2 id="rankTitle">오늘의 랭킹</h2>
+      <span class="chip" id="rankNote"></span>
+    </header>
+    <div class="rank-tabs gutter"><button class="pill selected" id="rankDaily" type="button">무한 달리기</button><button class="pill" id="rankStage" type="button">탐험 스테이지</button></div>
+    <p id="rankGap" class="rank-msg" hidden></p>
+    <p id="rankMsg" class="rank-msg gutter" hidden></p>
+    <ol id="rankList" class="gutter"></ol>
+    <div id="rankMe" class="gutter" hidden></div>
   </section>
 
   <section id="map" hidden>
@@ -78,20 +138,26 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
-<script src="js/core.js"></script>
+<script src="js/online-config.js"></script>
+<script src="shared/endless.js"></script>
+<script src="js/online-run.js"></script>
+<script src="js/core.js?v=online-1"></script>
+<script src="js/account.js"></script>
 <script src="js/renderer.js?v=aqua-2"></script>
 <script src="js/characters/penguin-soft.js?v=waddle-1"></script>
 <script src="js/characters/penguin-tiers.js?v=waddle-1"></script>
 <script src="js/characters/crab-model.js"></script>
 <script src="js/characters.js?v=vivid-1"></script>
-<script src="js/crowd.js?v=brawl-1"></script>
+<script src="js/crowd.js?v=endless-1"></script>
 <script src="js/environment/ice-models.js?v=ice-1"></script>
 <script src="js/environment.js?v=scatter-2"></script>
-<script src="js/water.js?v=aqua-2"></script>
-<script src="js/scene.js?v=scatter-1"></script>
+<script src="js/water.js?v=endless-1"></script>
+<script src="js/scene.js?v=endless-1"></script>
 <script src="js/audio.js?v=brawl-1"></script>
-<script src="js/combat.js?v=brawl-3"></script>
-<script src="js/game.js?v=brawl-2"></script>
+<script src="js/combat.js?v=endless-1"></script>
+<script src="js/game.js?v=endless-1"></script>
 <script src="js/map.js"></script>
-<script src="js/main.js"></script>
+<script src="js/endless.js"></script>
+<script src="js/leaderboard-ui.js"></script>
+<script src="js/main.js?v=online-1"></script>
 

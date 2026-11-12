@@ -139,6 +139,9 @@ class CrowdView {
   }
   update(dt, t) {
     this.layout();
+    if (this.logicalLayout) {
+      for (const v of this.logicalLayout) { const u = this.tiers[v.tier][v.index]; if (u) { u.ox = u.tx = v.x / 1000; u.oz = u.tz = v.z / 1000; u.sz = 1; } }
+    }
     this.tilt += (this.tiltT - this.tilt) * Math.min(1, dt * 9);
     this.arms += (this.armsT - this.arms) * Math.min(1, dt * 8);
     this.jump = Math.max(0, this.jump - dt / 0.42);
@@ -229,6 +232,7 @@ const Fx = (() => {
     }
   }
   return {
+    rebase(delta) { for (const p of P) p.z += delta; for (const p of Gh) p.z += delta; },
     kill(x, z, wet) {
       if (wet) { puff(x, 0.1, z, 0x7cc4f0, 5, 1.8, 4.5); puff(x, 0.1, z, 0xffffff, 3, 1.2, 5.5); return; }
       const g = Gh[gi]; gi = (gi + 1) % GN;

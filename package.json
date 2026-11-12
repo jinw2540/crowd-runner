@@ -1,6 +1,12 @@
 {
   "name": "crowd-runner",
   "private": true,
-  "scripts": { "test": "node --test tests/*.test.cjs" },
-  "devDependencies": { "three": "0.149.0" }
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "check:server": "deno check supabase/functions/endless/index.ts"
+  },
+  "devDependencies": {
+    "three": "0.149.0",
+    "@electric-sql/pglite": "0.3.16"
+  }
 }

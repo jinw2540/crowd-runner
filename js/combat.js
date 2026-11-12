@@ -68,6 +68,7 @@ const Combat = (() => {
     Sfx.brawl(final, strong);
   }
   return {
+    rebase(delta) { for (const target of pools) for (const p of target.particles) p.z += delta; },
     begin(player, rival) {
       sinceBeat = 0; beat = 0;
       burst(player, rival, false, Math.max(player.tall, rival.tall) > 2.4);

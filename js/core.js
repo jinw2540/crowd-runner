@@ -24,7 +24,35 @@ const Save = {
       }
     } catch (e) { /* storage unavailable: play without saving */ }
   },
-  store() { try { localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (e) { /* ignore */ } }
+  store() {
+    try { localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (e) { /* ignore */ }
+    if (typeof Account !== 'undefined') Account.push();
+  },
+  // Keep accounts separate on a shared browser. Import the old guest save only for its first owner.
+  switchUser(id) {
+    if (!this.baseKey) this.baseKey = this.key;
+    const next = id ? this.baseKey + ':account:' + id : this.baseKey;
+    if (next === this.key) return;
+    try { localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (_) {}
+    const empty = { level: 1, coins: 0, upStart: 0, upIncome: 0, muted: this.data.muted, stars: {}, best: {} };
+    let saved = null, claimed = null;
+    try { saved = localStorage.getItem(next); claimed = localStorage.getItem(this.baseKey + ':claimed'); } catch (_) {}
+    if (id && !saved && !claimed) {
+      try { saved = localStorage.getItem(this.baseKey); localStorage.setItem(this.baseKey + ':claimed', id); } catch (_) {}
+    }
+    this.key = next; this.data = empty;
+    if (saved) { try { const value = JSON.parse(saved); this.merge(value); if (typeof value.muted === 'boolean') this.data.muted = value.muted; } catch (_) {} }
+    try { localStorage.setItem(this.key, JSON.stringify(this.data)); } catch (_) {}
+  },
+  // Combine a server copy into the local one. Biggest value wins; coins are not added together.
+  merge(r) {
+    const d = this.data, n = v => Number.isFinite(v) ? v : 0;
+    for (const k of ['level', 'coins', 'upStart', 'upIncome']) d[k] = Math.max(d[k], n(r[k]));
+    for (const f of ['stars', 'best']) {
+      const o = r[f];
+      if (o && typeof o === 'object') for (const s of Object.keys(o)) d[f][s] = Math.max(d[f][s] || 0, n(o[s]));
+    }
+  }
 };
 Save.load();
 
@@ -40,7 +68,7 @@ function mulberry32(a) {
 function applyOp(n, g) {
   switch (g.op) {
     case '+': return n + g.v;
-    case '×': return n * g.v;
+    case '×': return Math.floor(n * g.v);
     case '−': return Math.max(1, n - g.v);
     default: return Math.max(1, Math.ceil(n / g.v));
   }
@@ -57,18 +85,22 @@ function genLevel(level) {
   if (level >= 3) kinds.push('pit');
   if (level >= 5) kinds.push('slider');
   const segs = [];
-  let best = 1, mults = 0, tripled = false, last = '';
-  const good = () => {
-    if (mults < 4 && best >= 3 && best < 300 && rnd() < 0.45) {
-      mults++;
-      if (!tripled && rnd() < 0.2) { tripled = true; return { op: '×', v: 3, good: true }; }
-      return { op: '×', v: 2, good: true };
-    }
-    return { op: '+', v: Math.max(2, nice(best * rf(0.4, 1.4) + ri(1, 4))), good: true };
+  let best = 1, mults = 0, tripled = false, evils = 0, last = '';
+  // Additions scale with the crowd early on, then stay modest so counts do not run away
+  const plus = () => ({ op: '+', v: Math.max(2, nice(best < 300 ? best * rf(0.4, 1.4) + ri(1, 4) : best * rf(0.1, 0.35))), good: true });
+  const canTimes = () => best >= 3 && best < 5000 && (best >= 300 || mults < 6);
+  const times = () => {
+    mults++;
+    if (best >= 300) return { op: '×', v: 1.5, good: true };
+    if (!tripled && rnd() < 0.2) { tripled = true; return { op: '×', v: 3, good: true }; }
+    return { op: '×', v: 2, good: true };
   };
+  const good = () => canTimes() && rnd() < 0.3 ? times() : plus();
   const bad = () => rnd() < 0.6
     ? { op: '−', v: Math.max(1, nice(best * rf(0.2, 0.6))), good: false }
     : { op: '÷', v: 2, good: false };
+  // How far apart the two results of a contested pair are on the best route: 10-25% either way
+  const near = () => rnd() < 0.5 ? rf(0.75, 0.9) : rf(1.1, 1.25);
 
   for (let i = 0; i < n; i++) {
     let kind = 'gate';
@@ -79,9 +111,19 @@ function genLevel(level) {
     }
     const z = -(30 + i * SEG);
     if (kind === 'gate') {
-      const a = good();
-      let b = rnd() < 0.45 ? good() : bad();
-      if (a.op === b.op && a.v === b.v) b = bad();
+      // A contested pair never offers the same operation twice (the bigger number would simply win).
+      // It is either add-versus-multiply or subtract-versus-divide, where the better gate depends on
+      // how many penguins the player has at that moment.
+      let a, b;
+      const contested = rnd() < 0.7;
+      if (contested && canTimes()) {
+        b = times();
+        a = { op: '+', v: Math.max(2, nice(best * (b.v - 1) * near())), good: true };
+      } else if (contested && best >= 8 && evils < 3) {
+        evils++;
+        a = { op: '÷', v: 2, good: false };
+        b = { op: '−', v: Math.max(1, nice(best * 0.5 * near())), good: false };
+      } else { a = good(); b = bad(); }
       best = Math.max(applyOp(best, a), applyOp(best, b));
       const flip = rnd() < 0.5;
       segs.push({ kind, z, left: flip ? b : a, right: flip ? a : b });
@@ -95,6 +137,9 @@ function genLevel(level) {
     }
     last = kind;
   }
-  const ratio = 0.4 + Math.min(level, 20) * 0.015;
+  // The boss is sized against the best possible route. The first three stages are forgiving;
+  // after that a wrong gate or two is enough to lose, and by stage 19 there is almost no slack.
+  const ratio = level <= 3 ? 0.5 : Math.min(0.9, 0.75 + (level - 4) * 0.01);
   return { level, segs, best, boss: Math.max(1, Math.floor(best * ratio)), bossZ: -(30 + n * SEG + 10) };
 }
+

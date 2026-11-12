@@ -1,0 +1,5 @@
+project_id = "crowd-runner"
+
+[functions.endless]
+# Tokens are verified against Auth in the handler; supports asymmetric signing keys.
+verify_jwt = false
