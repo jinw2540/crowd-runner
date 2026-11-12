@@ -6,7 +6,7 @@ const T = scope.THREE, shared = new WeakSet(), cache = new Map();
 const linear = hex => new T.Color(hex).convertSRGBToLinear();
 const materials = [
   new T.MeshPhongMaterial({ vertexColors: true, shininess: 65, specular: linear(0x9ccbd8) }),
-  new T.MeshPhongMaterial({ vertexColors: true, shininess: 5, specular: linear(0x14202a) })
+  new T.MeshPhongMaterial({ color: linear(0xeff4fc), vertexColors: true, shininess: 5, specular: linear(0x14202a) })
 ];
 materials.forEach(m => shared.add(m));
 
@@ -63,7 +63,7 @@ function asset(variant) {
   const model = source(scope.createIceFloe, options), parts = bake(model.root);
   const bounds = new T.Box3(); parts.forEach(p => { shared.add(p.geometry); bounds.union(p.geometry.boundingBox); });
   const radius = Math.hypot(Math.max(Math.abs(bounds.min.x), Math.abs(bounds.max.x)), Math.max(Math.abs(bounds.min.z), Math.abs(bounds.max.z)));
-  const result = { parts, info: { ...model.info }, radius };
+  const result = { parts, info: { ...model.info }, radius, outline: model.outline.map(p => p.clone()) };
   cache.set(variant, result); disposeSource(model.root);
   return result;
 }
@@ -101,7 +101,12 @@ function road(width, length) {
   disposeSource(model.root);
   const root = groupFrom(parts, 'Continuous soft ice road');
   root.traverse(o => { if (o.isMesh) o.userData.ground = true; });
-  root.userData = { width, length, surfaceY: 0, playableWidth: width * .84 };
+  const shoreline = model.outline.map(point => {
+    const p = point.clone().multiplyScalar(.955), z = Math.abs(p.y);
+    p.y = Math.sign(p.y) * (z <= middle ? z * stretch : z + (length - baseLength) / 2);
+    return p;
+  });
+  root.userData = { width, length, surfaceY: 0, playableWidth: width * .84, shoreline };
   return root;
 }
 
@@ -155,5 +160,5 @@ function driftField({ length, halfWidth, seaY, random, reserved = [] }) {
   return { root, placements, batches, update };
 }
 
-scope.IceEnvironment = { road, floe, driftField, isShared: resource => shared.has(resource) };
+scope.IceEnvironment = { road, floe, driftField, outline: variant => asset(variant).outline.map(p => p.clone()), isShared: resource => shared.has(resource) };
 })(typeof window !== 'undefined' ? window : globalThis);

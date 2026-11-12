@@ -79,7 +79,6 @@ const SNOWMAN = merge([
   (() => { const brim = new THREE.CylinderGeometry(0.4, 0.4, 0.05, 12); brim.translate(0, 2.56, 0); return tint(brim, 0x1c2541); })()
 ]);
 SHARED.add(SNOWMAN);
-let foamTex = null;
 // One cloth shape shared by every flag; its vertices are rippled each frame so all flags wave in the same wind.
 const FLAG_GEO = new THREE.PlaneGeometry(0.95, 0.52, 7, 1); FLAG_GEO.translate(0.475, 0, 0);
 SHARED.add(FLAG_GEO);
@@ -130,22 +129,6 @@ function buildLevel() {
   const roadWidth = W * 2 + 2.6;
   const road = IceEnvironment.road(roadWidth, L); road.position.z = midZ;
   levelGroup.add(road);
-  foamTex = canvasTex(64, 128, (ctx, w, h) => {
-    for (let y = 0; y < h; y++) {
-      const reach = w * (0.55 + 0.25 * Math.sin(y / h * 6.283 * 2) + 0.12 * Math.sin(y / h * 6.283 * 5));
-      const gr = ctx.createLinearGradient(0, 0, reach, 0);
-      gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(0.5, 'rgba(235,250,255,.55)'); gr.addColorStop(1, 'rgba(235,250,255,0)');
-      ctx.fillStyle = gr; ctx.fillRect(0, y, reach, 1);
-    }
-  });
-  foamTex.wrapT = THREE.RepeatWrapping; foamTex.repeat.set(1, L / 9);
-  for (const side of [-1, 1]) {
-    const foam = new THREE.Mesh(new THREE.PlaneGeometry(2.2, L), new THREE.MeshBasicMaterial({ map: foamTex, transparent: true, depthWrite: false }));
-    foam.rotation.x = -Math.PI / 2; foam.scale.x = side;
-    foam.position.set(side * (roadWidth / 2 + 1.05), SEA_Y + 0.05, midZ);
-    foam.material.side = THREE.DoubleSide;
-    levelGroup.add(foam);
-  }
   // Spectators use the same rounded floes as the rest of the environment.
   const reserved = [], men = Math.max(2, Math.floor(L / 45));
   for (let i = 0; i < men; i++) {
@@ -252,6 +235,14 @@ function buildLevel() {
   levelGroup.add(pad, igloo, tunnel, door, lip, flag(4.2, 4.6, level.bossZ - 12, 1));
   addFoe(0, level.bossZ, level.boss, 150, true);
 
+  // Contact contours follow the actual rounded/fractured outlines at the waterline.
+  const contours = [water.outline(road.userData.shoreline, { z: midZ })];
+  for (const e of iceScenery.placements) contours.push(water.outline(IceEnvironment.outline(e.variant), e));
+  for (const s of reserved) contours.push(water.outline(IceEnvironment.outline('spectator'), { x: s.x, z: s.z, scale: .96 }));
+  contours.push(water.outline(IceEnvironment.outline('finish'), { z: level.bossZ, scale: .96 }));
+  levelGroup.add(water.createContacts(contours));
+
+
   // Shadows: flat ground only receives, see-through things do neither, everything else does both
   levelGroup.traverse(o => {
     if (!o.isMesh || o.userData.crowd || o.material.transparent) return;
@@ -262,36 +253,11 @@ function buildLevel() {
 
 /* ---------- Scenery that follows the camera: sea, snowy mountains, falling snow ---------- */
 const farGroup = new THREE.Group(); scene.add(farGroup);
-// Tileable wave strokes: every stroke is drawn nine times so it wraps cleanly at the edges
-function waves(ctx, w, n, seed, styles, width) {
-  const r = mulberry32(seed);
-  ctx.lineCap = 'round'; ctx.lineWidth = width;
-  for (let i = 0; i < n; i++) {
-    const x = r() * w, y = r() * w, len = 18 + r() * 46, bend = (r() - 0.5) * 14;
-    ctx.strokeStyle = styles[i % styles.length];
-    for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
-      ctx.beginPath(); ctx.moveTo(x + ox * w, y + oy * w);
-      ctx.quadraticCurveTo(x + ox * w + len / 2, y + oy * w + bend, x + ox * w + len, y + oy * w);
-      ctx.stroke();
-    }
-  }
-}
-const SEA = 700, SEA_REP = 46, SHINE_REP = 29;
-const seaTex = canvasTex(256, 256, (ctx, w) => {
-  ctx.fillStyle = '#16659e'; ctx.fillRect(0, 0, w, w);
-  waves(ctx, w, 46, 11, ['rgba(92,170,222,.5)', 'rgba(9,66,116,.45)', 'rgba(60,140,200,.4)'], 3.5);
-});
-const shineTex = canvasTex(256, 256, (ctx, w) => waves(ctx, w, 30, 23, ['rgba(255,255,255,.55)', 'rgba(200,236,255,.4)'], 1.6));
-seaTex.wrapS = seaTex.wrapT = shineTex.wrapS = shineTex.wrapT = THREE.RepeatWrapping;
-seaTex.repeat.set(SEA_REP, SEA_REP); shineTex.repeat.set(SHINE_REP, SHINE_REP);
-const sea = new THREE.Mesh(new THREE.PlaneGeometry(SEA, SEA), new THREE.MeshPhongMaterial({ map: seaTex, shininess: 120, specular: C(0x6f9fc4) }));
-sea.rotation.x = -Math.PI / 2; sea.position.set(0, SEA_Y, -150); sea.receiveShadow = true;
-const shine = new THREE.Mesh(new THREE.PlaneGeometry(SEA, SEA), new THREE.MeshBasicMaterial({ map: shineTex, transparent: true, depthWrite: false }));
-shine.rotation.x = -Math.PI / 2; shine.position.set(0, SEA_Y + 0.015, -150);
-farGroup.add(sea, shine);
+const water = createStylizedWater(THREE, SEA_Y);
+farGroup.add(water.mesh);
 {
   let g = new THREE.ConeGeometry(1, 1, 6, 1); g.translate(0, 0.5, 0); g = g.toNonIndexed();
-  const n = g.attributes.position.count, col = new Float32Array(n * 3), top = C(0xffffff), low = C(0xa9cfe9);
+  const n = g.attributes.position.count, col = new Float32Array(n * 3), top = C(0xffffff), low = C(0xb2d9ee);
   for (let i = 0; i < n; i++) { const c = g.attributes.position.getY(i) > 0.5 ? top : low; col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.computeVertexNormals();
@@ -317,16 +283,17 @@ flakes.frustumCulled = false;
 farGroup.add(flakes);
 function updateFar(dt, z, t, moving) {
   farGroup.position.z = z;
-  // The sea sheet travels with the camera; shifting its texture the other way keeps the waves fixed in the world while they drift.
+  // World-space wave coordinates remain anchored as the camera advances.
   const drift = calm ? 0 : t;
-  seaTex.offset.set(drift * 0.012, -SEA_REP * z / SEA + drift * 0.02);
-  shineTex.offset.set(-drift * 0.02, -SHINE_REP * z / SEA - drift * 0.03);
-  if (foamTex) foamTex.offset.y = drift * 0.04;
+  water.update(t, calm);
   waveFlags(drift);
   if (iceScenery) iceScenery.update(t, z, calm);
   sun.target.position.set(0, 0, z - 24);
   sun.position.set(22, 40, z - 54);
   sun.target.updateMatrixWorld();
+  fill.position.set(-14 + camera.position.x * .25, 19, z + 24);
+  fill.target.position.set(0, 1, z - 8);
+  fill.target.updateMatrixWorld();
   for (let i = 0; i < FLAKES; i++) {
     const o = i * 3;
     flakePos[o] += Math.sin(t + i) * 0.4 * dt;

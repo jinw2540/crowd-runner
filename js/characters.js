@@ -185,7 +185,8 @@
       characterTime: { value: 0 }, characterClip: { value: 0 }, characterPreviousClip: { value: 0 }, characterTransition: { value: 1 },
       characterDurations: { value: new T.Vector3(...asset.durations) }
     };
-    const material = new T.MeshLambertMaterial({ vertexColors: true });
+    // A small albedo lift keeps the approved navy/coral colours readable against bright snow.
+    const material = new T.MeshLambertMaterial({ color: new T.Color(1.16, 1.16, 1.16), vertexColors: true });
     const depth = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking });
     const patch = shader => {
       Object.assign(shader.uniforms, uniforms);
