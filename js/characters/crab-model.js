@@ -145,14 +145,17 @@ scope.createCrowdCrab=function(T,options={}){
   }
 
   function bodyPose(p,mode){
-    const run=mode==='Scuttle',wave=mode==='Wave';
-    const position=new T.Vector3(run?.034*Math.sin(p):0,run?.015*(1-Math.cos(p*2)):.006*Math.sin(p),0);
-    const quaternion=new T.Quaternion().setFromEuler(new T.Euler(run?.018:0,run?.012*Math.sin(p):.024*Math.sin(p),run?.025*Math.sin(p):wave?.016*Math.sin(p):.006*Math.sin(p)));
-    const sy=run?1-.01*Math.cos(p*2):1+.006*Math.sin(p),scale=new T.Vector3(1/Math.sqrt(sy),sy,1/Math.sqrt(sy));
+    const run=mode==='Scuttle',wave=mode==='Wave',snap=mode==='Snap';
+    // Snap: rear back (W), then lunge and bring the claws down (S).
+    const S=Math.pow(Math.max(0,Math.sin(p)),2),Wd=Math.pow(Math.max(0,-Math.sin(p)),2);
+    const position=snap?new T.Vector3(0,.035*Wd,.17*S-.06*Wd):new T.Vector3(run?.034*Math.sin(p):0,run?.015*(1-Math.cos(p*2)):.006*Math.sin(p),0);
+    const quaternion=new T.Quaternion().setFromEuler(snap?new T.Euler(.15*S-.13*Wd,0,.02*Math.sin(p)):new T.Euler(run?.018:0,run?.012*Math.sin(p):.024*Math.sin(p),run?.025*Math.sin(p):wave?.016*Math.sin(p):.006*Math.sin(p)));
+    const sy=snap?1-.04*S:run?1-.01*Math.cos(p*2):1+.006*Math.sin(p),scale=new T.Vector3(1/Math.sqrt(sy),sy,1/Math.sqrt(sy));
     return{position,quaternion,scale,inverse:new T.Matrix4().compose(position,quaternion,scale).invert()};
   }
   function makeClip(mode,duration){
-    const times=Array.from({length:97},(_,i)=>duration*i/96),phases=times.map(t=>t/duration*Math.PI*2),tracks=[],poses=phases.map(p=>bodyPose(p,mode)),run=mode==='Scuttle',wave=mode==='Wave';
+    const times=Array.from({length:97},(_,i)=>duration*i/96),phases=times.map(t=>t/duration*Math.PI*2),tracks=[],poses=phases.map(p=>bodyPose(p,mode)),run=mode==='Scuttle',wave=mode==='Wave',snap=mode==='Snap';
+    const S=p=>Math.pow(Math.max(0,Math.sin(p)),2),Wd=p=>Math.pow(Math.max(0,-Math.sin(p)),2);
     const vector=(node,prop,fn)=>tracks.push(new T.VectorKeyframeTrack(node.name+'.'+prop,times,phases.flatMap((p,i)=>fn(p,i))));
     const quat=(node,fn)=>tracks.push(new T.QuaternionKeyframeTrack(node.name+'.quaternion',times,phases.flatMap((p,i)=>fn(p,i).toArray())));
     const rotation=(node,fn)=>quat(node,(p,i)=>new T.Quaternion().setFromEuler(new T.Euler(...fn(p,i))));
@@ -170,17 +173,22 @@ scope.createCrowdCrab=function(T,options={}){
       quat(leg.hip,(_,i)=>hipQs[i]);quat(leg.bend,(_,i)=>kneeQs[i]);
     }
     arms.forEach(({s,shoulder,elbow},i)=>{
+      // The two claws strike in turn.
+      if(snap){const q=p=>p+i*Math.PI;
+        rotation(shoulder,p=>[.50*S(q(p))-.40*Wd(q(p)),0,s*(.10+.34*Wd(q(p)))]);
+        rotation(elbow,p=>[.25*S(q(p)),0,s*(.10+.30*Wd(q(p))-.06*S(q(p)))]);
+        rotation(thumbs[i],p=>[0,0,s*(.05+.34*Wd(q(p))-.03*S(q(p)))]);return;}
       rotation(shoulder,p=>[run?.035*Math.sin(p+i*Math.PI):0,(run?.035:.02)*Math.sin(p+i),s*(wave?.13+.06*Math.sin(p*2+i):run?.035*Math.sin(p+i*Math.PI):.015*Math.sin(p+i))]);
       rotation(elbow,p=>[0,.02*Math.sin(p-.5+i),s*(wave?.12+.07*Math.sin(p*2-.4+i):.025*Math.sin(p-.4+i))]);
       rotation(thumbs[i],p=>[0,0,s*(wave?.06+.24*Math.sin(p*3+i*.6):run?.07+.13*Math.sin(p*2+i):.02+.08*Math.sin(p+i*.8))]);
     });
     eyeStems.forEach((eye,i)=>rotation(eye,p=>[(run?.025:.015)*Math.sin(p-.4+i*.3),.03*Math.sin(p+i*.5),(i?1:-1)*.02*Math.sin(p-.6)]));
     lids.forEach((lid,i)=>vector(lid,'scale',(p,f)=>{
-      let sy=1;if(!run)for(const c of [duration*.37,duration*.81]){const d=Math.abs(times[f]-c-i*.012);if(d<.11)sy=Math.min(sy,.06+.94*Math.pow(d/.11,2));}return[1,sy,1];
+      let sy=1;if(!run&&!snap)for(const c of [duration*.37,duration*.81]){const d=Math.abs(times[f]-c-i*.012);if(d<.11)sy=Math.min(sy,.06+.94*Math.pow(d/.11,2));}return[1,sy,1];
     }));
     return new T.AnimationClip(mode,duration,tracks);
   }
-  const clips=[makeClip('Idle',5.6),makeClip('Scuttle',1.12*(1+tier*.15)),makeClip('Wave',3.2)];
+  const clips=[makeClip('Idle',5.6),makeClip('Scuttle',1.12*(1+tier*.15)),makeClip('Wave',3.2),makeClip('Snap',.60*(1+tier*.15))];
   const growthScale=options.growthScale===false?1:info.scale;root.scale.setScalar(growthScale);root.updateMatrixWorld(true);
   root.userData={version:2,title:'Deep Coral Crab',mouth:'rounded zigzag',forward:'+Z',tier,representedCount:info.value,tierScale:info.scale,growthScaleApplied:options.growthScale!==false,walkingLegs:8,claws:2};
   const mixer=new T.AnimationMixer(root),actions=Object.fromEntries(clips.map(c=>[c.name,mixer.clipAction(c)]));let active=actions.Idle;active.play();

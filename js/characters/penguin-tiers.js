@@ -112,7 +112,7 @@ scope.createCrowdPenguin=function(T,options={}){
   }
   const clips=model.clips.map(c=>c.clone());
   for(const c of clips){
-    const times=Array.from({length:97},(_,i)=>i/96*c.duration),walk=c.name==='Waddle';
+    const times=Array.from({length:97},(_,i)=>i/96*c.duration),walk=c.name==='Waddle'||c.name==='Bump';
     capeBones.forEach((bone,i)=>{
       const values=[];for(const t of times){const p=t/c.duration*Math.PI*2,q=new T.Quaternion().setFromEuler(new T.Euler((i===0?.018:0)+(walk?.060:.012)*Math.sin(p-.65*i),0,(walk?.045:.009)*Math.sin(p-.5*i)));values.push(q.x,q.y,q.z,q.w);}
       c.tracks.push(new T.QuaternionKeyframeTrack(bone.name+'.quaternion',times,values));

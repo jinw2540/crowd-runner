@@ -111,9 +111,10 @@
     geometry.setAttribute('characterWeight', new T.Float32BufferAttribute(weights, 2));
     geometry.setIndex(indices);
 
-    // Three affine rows per joint; 32 poses per clip, interpolated by the vertex shader.
+    // Three affine rows per joint; 32 poses for each of the four clips (idle, move, wave, attack),
+    // interpolated by the vertex shader.
     // Each instance has its own phase. No per-character mixers or per-frame vertex uploads.
-    const width = nodes.length * 3, height = FRAMES * 3;
+    const width = nodes.length * 3, height = FRAMES * model.clips.length;
     const data = new Float32Array(width * height * 4), matrix = new T.Matrix4();
     const durations = model.clips.map(c => c.duration);
     model.clips.forEach((clip, c) => {
@@ -160,7 +161,7 @@
     uniform float characterClip;
     uniform float characterPreviousClip;
     uniform float characterTransition;
-    uniform vec3 characterDurations;
+    uniform vec4 characterDurations;
     attribute vec2 characterJoint;
     attribute vec2 characterWeight;
     attribute float characterPhase;
@@ -168,7 +169,7 @@
       return texture2D(characterPoses, vec2((joint * 3.0 + row + 0.5) / characterAtlasSize.x, (frame + 0.5) / characterAtlasSize.y));
     }
     mat4 jointPose(float joint, float clip) {
-      float duration = clip < 0.5 ? characterDurations.x : (clip < 1.5 ? characterDurations.y : characterDurations.z);
+      float duration = clip < 0.5 ? characterDurations.x : (clip < 1.5 ? characterDurations.y : (clip < 2.5 ? characterDurations.z : characterDurations.w));
       float phase = fract(characterTime / duration + characterPhase) * 32.0;
       float f = floor(phase), next = mod(f + 1.0, 32.0), t = fract(phase);
       f += clip * 32.0; next += clip * 32.0;
@@ -196,7 +197,7 @@
     const uniforms = {
       characterPoses: { value: asset.texture }, characterAtlasSize: { value: new T.Vector2(asset.texture.image.width, asset.texture.image.height) },
       characterTime: { value: 0 }, characterClip: { value: 0 }, characterPreviousClip: { value: 0 }, characterTransition: { value: 1 },
-      characterDurations: { value: new T.Vector3(...asset.durations) }
+      characterDurations: { value: new T.Vector4(...asset.durations) }
     };
     // Neutral exposure complements the baked palette lift across every growth tier.
     const material = new T.MeshLambertMaterial({ color: new T.Color(1.16, 1.16, 1.16), vertexColors: true });
@@ -212,7 +213,7 @@
       `);
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', 'vec3 transformed = (characterTransform * vec4(position, 1.0)).xyz;');
     };
-    if (animated) { material.onBeforeCompile = depth.onBeforeCompile = patch; material.customProgramCacheKey = depth.customProgramCacheKey = () => 'crowd-character-v1'; }
+    if (animated) { material.onBeforeCompile = depth.onBeforeCompile = patch; material.customProgramCacheKey = depth.customProgramCacheKey = () => 'crowd-character-v2'; }
     const mesh = new T.InstancedMesh(geometry, material, capacity);
     mesh.customDepthMaterial = depth; mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
     mesh.frustumCulled = false; mesh.castShadow = true; mesh.receiveShadow = true;
@@ -221,7 +222,7 @@
     return {
       mesh, asset, phase,
       update(dt, time, mode) {
-        const clip = mode === 'run' ? 1 : mode === 'cheer' || mode === 'wave' ? 2 : 0;
+        const clip = mode === 'run' ? 1 : mode === 'cheer' || mode === 'wave' ? 2 : mode === 'fight' ? 3 : 0;
         if (clip !== active) { uniforms.characterPreviousClip.value = active; active = clip; elapsed = 0; }
         elapsed += dt; uniforms.characterTransition.value = Math.min(1, elapsed / 0.28);
         uniforms.characterClip.value = active;

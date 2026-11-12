@@ -146,34 +146,36 @@ scope.createSoftPenguin=function(T,options={}){
   // Standard clip tracks preserve the new motion when exported to GLB.
   function makeClip(mode,duration){
     const tracks=[],times=Array.from({length:97},(_,i)=>i/96*duration),TAU=Math.PI*2;
-    const walk=mode==='Waddle',wave=mode==='Wave';
+    const walk=mode==='Waddle',wave=mode==='Wave',bump=mode==='Bump';
+    // Bump: lean back to wind up (W), then throw the belly and head forward (S).
+    const S=p=>Math.pow(Math.max(0,Math.sin(p)),2),Wd=p=>Math.pow(Math.max(0,-Math.sin(p)),2);
     const vectors=(node,prop,fn)=>tracks.push(new T.VectorKeyframeTrack(node.name+'.'+prop,times,times.flatMap(t=>fn(t/duration*TAU,t))));
     const rotation=(node,fn)=>{const values=[];times.forEach(t=>{const q=new T.Quaternion().setFromEuler(new T.Euler(...fn(t/duration*TAU,t)));values.push(q.x,q.y,q.z,q.w);});tracks.push(new T.QuaternionKeyframeTrack(node.name+'.quaternion',times,values));};
     // Shift the torso over the planted foot; feet remain outside this rolling rig.
     // The broad silhouette reads at runner distance without making the whole bird hop.
-    vectors(rig,'position',p=>[walk?.10*Math.sin(p):0,walk?.030-.025*Math.cos(p*2):.007*Math.sin(p),0]);
-    vectors(rig,'scale',p=>{const sy=walk?1-.012*Math.cos(p*2):1+.006*Math.sin(p);return[1/Math.sqrt(sy),sy,1/Math.sqrt(sy)];});
-    rotation(rig,p=>[walk?.035:0,walk?.028*Math.sin(p):0,walk?-.170*Math.sin(p):wave?-.035:.008*Math.sin(p)]);
-    rotation(head,p=>[walk?.025*Math.sin(p*2-.5):-.018+.018*Math.sin(p),walk?-.045*Math.sin(p-.3):.10*Math.sin(p),walk?.040*Math.sin(p-.3):wave?-.10:.045+.025*Math.sin(p-.6)]);
+    vectors(rig,'position',p=>bump?[0,.05*S(p),.24*S(p)-.08*Wd(p)]:[walk?.10*Math.sin(p):0,walk?.030-.025*Math.cos(p*2):.007*Math.sin(p),0]);
+    vectors(rig,'scale',p=>{const sy=bump?1-.06*S(p)+.035*Wd(p):walk?1-.012*Math.cos(p*2):1+.006*Math.sin(p);return[1/Math.sqrt(sy),sy,1/Math.sqrt(sy)];});
+    rotation(rig,p=>bump?[.34*S(p)-.16*Wd(p),0,.035*Math.sin(p)]:[walk?.035:0,walk?.028*Math.sin(p):0,walk?-.170*Math.sin(p):wave?-.035:.008*Math.sin(p)]);
+    rotation(head,p=>bump?[.26*S(p)-.12*Wd(p),0,0]:[walk?.025*Math.sin(p*2-.5):-.018+.018*Math.sin(p),walk?-.045*Math.sin(p-.3):.10*Math.sin(p),walk?.040*Math.sin(p-.3):wave?-.10:.045+.025*Math.sin(p-.6)]);
     shoulders.forEach((w,i)=>{
       const s=i?1:-1;
-      rotation(w,p=>[walk?.18*Math.sin(p+i*Math.PI-.45):.03*Math.sin(p),0,wave&&i===1?1.85+.10*Math.sin(p*3):s*(.13+(walk?.060*Math.cos(p*2):.025*Math.sin(p)))]);
-      rotation(tips[i],p=>[walk?.09*Math.sin(p+i*Math.PI-.8):0,0,wave&&i===1?.30*Math.sin(p*3-.4):s*.08*Math.sin(p-.6)]);
+      rotation(w,p=>bump?[.35*Wd(p)-.55*S(p),0,s*(.20+1.05*Wd(p)+.45*S(p))]:[walk?.18*Math.sin(p+i*Math.PI-.45):.03*Math.sin(p),0,wave&&i===1?1.85+.10*Math.sin(p*3):s*(.13+(walk?.060*Math.cos(p*2):.025*Math.sin(p)))]);
+      rotation(tips[i],p=>bump?[-.2*S(p),0,s*.3*Wd(p)]:[walk?.09*Math.sin(p+i*Math.PI-.8):0,0,wave&&i===1?.30*Math.sin(p*3-.4):s*.08*Math.sin(p-.6)]);
     });
     feet.forEach((f,i)=>{const s=i?1:-1;
       vectors(f,'position',p=>{const q=p+i*Math.PI;return[s*.285,.072+(walk?.145*Math.pow(Math.max(0,Math.sin(q)),2):0),.12+(walk?-.17*Math.cos(q):0)];});
       rotation(f,p=>[walk?.20*Math.sin(p+i*Math.PI):0,s*.17,0]);
     });
-    scarfTails.forEach((s,i)=>rotation(s,p=>[(walk?.085:.012)*Math.sin(p-1.0-i*.30),.018*Math.sin(p-.5),(i?.22:-.12)+(walk?.040:.025)*Math.sin(p-.9-i*.20)]));
+    scarfTails.forEach((s,i)=>rotation(s,p=>[(walk?.085:bump?.11:.012)*Math.sin(p-1.0-i*.30),.018*Math.sin(p-.5),(i?.22:-.12)+(walk?.040:.025)*Math.sin(p-.9-i*.20)]));
     // Blinks are part of the exported idle/wave animation as well.
     lids.forEach((lid,i)=>vectors(lid,'scale',(p,t)=>{
-      const centers=walk?[]:[duration*.36,duration*.84];let y=1;
+      const centers=walk||bump?[]:[duration*.36,duration*.84];let y=1;
       centers.forEach(c=>{const d=Math.abs(t-c);if(d<.10)y=Math.min(y,.06+.94*Math.pow(d/.10,2));});
       return[1,y,1];
     }));
     return new T.AnimationClip(mode,duration,tracks);
   }
-  const clips=[makeClip('Idle',5.6),makeClip('Waddle',1.12),makeClip('Wave',2.8)];
+  const clips=[makeClip('Idle',5.6),makeClip('Waddle',1.12),makeClip('Wave',2.8),makeClip('Bump',.64)];
   const mixer=new T.AnimationMixer(root),actions=Object.fromEntries(clips.map(c=>[c.name,mixer.clipAction(c)]));let active=actions.Idle;active.play();
   function update(dt,mode='Idle'){
     const action=actions[mode]||actions.Idle;

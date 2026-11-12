@@ -3,7 +3,7 @@
 'use strict';
 
 /* ---------- Game state ---------- */
-const G = { state: 'menu', stage: Save.data.level, nextStage: Save.data.level, count: 1, x: 0, lastX: 0, z: 0, t: 0, fight: null, bigHit: 0, short: 0, endTimer: 0, pending: null, walkFrom: 0 };
+const G = { state: 'menu', stage: Save.data.level, nextStage: Save.data.level, count: 1, x: 0, lastX: 0, z: 0, t: 0, fight: null, bigHit: 0, short: 0, endTimer: 0, pending: null, walkFrom: 0, line: { x: 0, z: 0 }, cam: 0 };
 const player = new CrowdView('penguin');
 scene.add(player.group);
 const keys = { l: false, r: false };
@@ -17,7 +17,7 @@ function sync() { player.setValue(G.count); }
 function resetRun() {
   G.count = startCount(); G.x = 0; G.lastX = 0; G.z = 0; G.fight = null; G.pending = null;
   player.cx = 0; player.cz = 0; player.hop = 1; G.bigHit = 0; G.short = 0;
-  player.resetImpact(); Combat.reset();
+  player.resetFight(); Combat.reset(); G.cam = 0;
   player.setValue(G.count, { instant: true });
   camPos.set(0, 9, 12);
 }
@@ -132,6 +132,9 @@ function hitHazard(h, x, z) {
   return Math.abs(dx) < 2.25 && Math.abs(dz) < 2;
 }
 
+// Two crowds stop this far apart and fight across the gap; bigger characters need more room.
+const lineGap = f => 1.1 + 0.15 * (player.tall + f.view.tall);
+const onContact = (x, z, unitScale) => Combat.contact(x, z, unitScale);
 function step(dt) {
   G.t += dt;
   for (const h of hazards) {
@@ -140,7 +143,11 @@ function step(dt) {
   }
 
   if (G.state === 'running') {
-    G.z -= (G.fight ? 2.5 : SPEED) * dt;
+    if (G.fight) {
+      // Hold the line; close up only as the crowds thin out.
+      const hold = G.fight.view.cz + player.radius + G.fight.view.radius + lineGap(G.fight);
+      if (G.z > hold) G.z = Math.max(hold, G.z - 2.5 * dt);
+    } else G.z -= SPEED * dt;
     G.x = clamp(G.x + ((keys.r ? 1 : 0) - (keys.l ? 1 : 0)) * 9 * dt, -W + 0.6, W - 0.6);
     player.tiltT = clamp((G.x - G.lastX) / Math.max(dt, 0.001) / 10, -1, 1); G.lastX = G.x;
     player.cx = G.x; player.cz = G.z;
@@ -192,26 +199,36 @@ function step(dt) {
         f.view.hop = 1; f.view.cz += 3 * dt;
         f.view.cx += (G.x - f.view.cx) * Math.min(1, dt * 1.5);
       }
-      if (!G.fight && gap < player.radius + f.view.radius + 0.8) {
+      // Stop one step short, whatever the frame rate, so the crowds never run into each other.
+      const hold = player.radius + f.view.radius + lineGap(f);
+      if (!G.fight && gap < hold + (SPEED + 3) * dt) {
         G.fight = f; f.acc = 0; f.view.hop = 1;
+        G.z = Math.max(G.z, f.view.cz + hold);
+        const m = Math.min(G.count, f.size);
         // When a boss fight is going to be close, its last few exchanges play out slowly
         f.tense = f.isBoss && Math.abs(G.count - f.size) <= closeCall(f.size) ? Math.max(4, Math.round(Math.min(G.count, f.size) * 0.08)) : 0;
-        f.rate = Math.max(12, Math.min(G.count, f.size) / (f.isBoss ? 1.5 : 0.8));
+        // Even the smallest fight lasts long enough to see; the slow ending is kept to about a second.
+        f.rate = m / (f.isBoss ? clamp(0.6 + m * 0.1, 0.9, 1.8) : clamp(0.35 + m * 0.12, 0.5, 1));
+        f.slowRate = Math.min(m, f.tense) / 1.2;
+        player.onContact = f.view.onContact = onContact;
         Combat.begin(player, f.view);
       }
     }
     const f = G.fight;
     if (f) {
-      f.acc += f.rate * dt * (Math.min(G.count, f.size) <= f.tense ? 0.22 : 1);
+      Combat.line(player, f.view, G.line);
+      player.front = f.view.front = G.line;
+      f.acc += (Math.min(G.count, f.size) <= f.tense ? Math.max(f.rate * 0.22, f.slowRate) : f.rate) * dt;
       const k = Math.min(Math.floor(f.acc), G.count, f.size);
       if (k > 0) { f.acc -= k; G.count -= k; f.size -= k; Combat.damage(player, f.view, k); }
       f.view.cx += (G.x - f.view.cx) * Math.min(1, dt * 4);
       f.view.setValue(f.size);
       sync();
-      if (G.count <= 0) { G.short = f.isBoss ? f.size + 1 : 0; finish(false, f.isBoss ? '보스 무리가 더 많았어요' : '모두 쓰러졌어요'); return; }
+      if (G.count <= 0) { f.view.front = null; G.short = f.isBoss ? f.size + 1 : 0; finish(false, f.isBoss ? '보스 무리가 더 많았어요' : '모두 쓰러졌어요'); return; }
       if (f.size <= 0) {
-        Combat.finish(player, f.view);
-        f.dead = true; f.view.group.visible = false; G.fight = null;
+        Combat.finish(player, f.view, f.isBoss);
+        // The last ones are still being knocked away, so the group stays visible for a moment.
+        f.dead = true; f.fade = 0.8; player.front = null; G.fight = null;
         if (f.isBoss) { finish(true); return; }
       }
     }
@@ -222,29 +239,44 @@ function step(dt) {
 
 /* ---------- Camera and frame ---------- */
 const camPos = new THREE.Vector3(0, 9, 12);
+const fightCam = { x: 0, y: 9, z: 12, lz: -8 };
 function frame(dt) {
   step(dt);
   const run = G.state === 'running';
   player.mode = run ? 'run' : G.state === 'win' ? 'cheer' : 'idle';
   if (!run) player.tiltT = 0;
-  let near = !!G.fight;
-  for (const f of foes) {
-    if (f.dead) continue;
-    f.view.armsT = f.view.hop >= 1 ? 1 : 0;
-    if (f.view.cz < G.z && G.z - f.view.cz < 16) near = true;
-  }
-  player.armsT = run && near ? 1 : 0;
+  // Claws go up when the boss sees the penguins coming, and when the crabs have won.
+  for (const f of foes) if (!f.dead) f.view.armsT = G.state === 'lose' || (f.isBoss && !G.fight && G.z - f.view.cz < 26) ? 1 : 0;
   player.update(dt, G.t);
   Fx.update(dt);
-  for (const f of foes) if (!f.dead) f.view.update(dt, G.t);
+  for (const f of foes) {
+    if (!f.dead) f.view.update(dt, G.t);
+    else if (f.fade > 0) { f.view.update(dt, G.t); if ((f.fade -= dt) <= 0) f.view.group.visible = false; }
+  }
 
   // Pull back and up when big penguins are present so they do not hide the gate ahead
   const r = player.radius + Math.max(0, player.tall - 1.26) * 1.8, far = portrait ? 1.25 : 1, menu = G.state === 'menu';
-  const tx = G.x * 0.45, ty = (7.5 + r * 0.9) * far, tz = G.z + (10 + r * 1.3) * far;
+  let tx = G.x * 0.45, ty = (7.5 + r * 0.9) * far, tz = G.z + (10 + r * 1.3) * far;
+  let lx = tx, ly = menu ? -4.5 : 0, lz = G.z - 8;
+  // In a fight the camera comes in over the penguins and looks down at the line between the crowds.
+  const fight = G.fight && !G.fight.dead && !menu ? G.fight : null;
+  G.cam += ((fight ? 1 : 0) - G.cam) * (1 - Math.exp(-dt * 3.5));
+  if (fight) {
+    // Kept relative to the penguins so the view eases back smoothly once they run on.
+    // A tall screen has room to look down steeply from close by; a wide one has to stand further back.
+    const span = player.radius + fight.view.radius, back = portrait ? 1 : 1.3;
+    fightCam.x = G.line.x * 0.6; fightCam.y = (4.2 + span * 0.95) * back; fightCam.z = G.line.z + (2.4 + span * 0.72) * back - G.z;
+    fightCam.lz = G.line.z - span * 0.1 - G.z;
+  }
+  if (G.cam > 0.001) {
+    const c = G.cam;
+    tx += (fightCam.x - tx) * c; ty += (fightCam.y - ty) * c; tz += (G.z + fightCam.z - tz) * c;
+    lx += (fightCam.x - lx) * c; ly += (0.3 - ly) * c; lz += (G.z + fightCam.lz - lz) * c;
+  }
   const k = 1 - Math.exp(-dt * 6);
   camPos.x += (tx - camPos.x) * k; camPos.y += (ty - camPos.y) * k; camPos.z += (tz - camPos.z) * k;
   camera.position.copy(camPos);
-  camera.lookAt(tx, menu ? -4.5 : 0, G.z - 8);
+  camera.lookAt(lx, ly, lz);
   Combat.update(dt, camera); Combat.shakeCamera(camera);
 
   used = 0;
@@ -261,7 +293,8 @@ function frame(dt) {
 }
 let prev = performance.now();
 function loop(now) {
-  const raw = (now - prev) / 1000, dt = Math.min(0.05, raw); prev = now;
+  const raw = (now - prev) / 1000; prev = now;
+  const dt = Math.min(0.05, raw) * Combat.timeScale(raw);
   if (Q.shadows && !Q.locked) {
     Q.slow = raw > 0.034 ? Q.slow + Math.min(raw, 0.1) : Math.max(0, Q.slow - raw);
     if (Q.slow > 2.5) setShadows(false);

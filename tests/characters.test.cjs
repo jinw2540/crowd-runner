@@ -147,21 +147,64 @@ test('merge/split, per-tier instance capacity, shadows and fallback keep working
   assert.equal(fallback.batches[3].mesh.count, 1);
 });
 
-test('impact poses move the render instances without moving collision positions', () => {
+function crowdSandbox() {
   const sandbox = { THREE: T, CharacterModels, SIZE: 1.4, W: 5, Q: { shadows: true },
     clamp: (v, a, b) => Math.max(a, Math.min(b, v)), scene: new T.Scene(),
     renderer: { capabilities: { vertexTextures: true, isWebGL2: true } } };
   vm.createContext(sandbox);
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/crowd.js'), 'utf8') + '\nthis.CrowdView=CrowdView;', sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/crowd.js'), 'utf8') + '\nthis.CrowdView=CrowdView;this.Fx=Fx;', sandbox);
+  return sandbox;
+}
+
+test('facing the fighting line turns the render instances without moving collision positions', () => {
+  const sandbox = crowdSandbox();
   for (const kind of ['penguin', 'crab']) {
     const crowd = new sandbox.CrowdView(kind); crowd.mode = 'run'; crowd.setValue(1111, { instant: true }); crowd.update(0, 0);
     const positions = () => Array.from(crowd.tiers, list => Array.from(list, u => [u.wx, u.wz]));
     const before = positions(), matrix = new T.Matrix4(), after = new T.Matrix4();
     crowd.batches[3].mesh.getMatrixAt(0, matrix);
-    crowd.impact(1, 1); crowd.celebrateImpact(); crowd.update(.06, .06);
+    crowd.front = { x: 2, z: kind === 'crab' ? 4 : -4 }; crowd.celebrate(); crowd.update(.06, .06);
     assert.deepEqual(positions(), before); crowd.batches[3].mesh.getMatrixAt(0, after);
     assert(!matrix.equals(after)); assert(after.elements.every(Number.isFinite));
-    crowd.resetImpact(); crowd.update(0, .06); crowd.batches[3].mesh.getMatrixAt(0, after);
+    crowd.resetFight(); crowd.update(0, .06); crowd.batches[3].mesh.getMatrixAt(0, after);
     assert(matrix.equals(after), 'reset must remove combat transforms');
   }
+});
+
+test('those who fall in a fight charge to the line, collide there once and are knocked away', () => {
+  const sandbox = crowdSandbox();
+  for (const kind of ['penguin', 'crab']) {
+    const crowd = new sandbox.CrowdView(kind), contacts = [], back = kind === 'crab' ? -1 : 1;
+    crowd.mode = 'run'; crowd.setValue(13, { instant: true }); crowd.update(0, 0);
+    crowd.front = { x: 0, z: -back * (crowd.radius + .65) }; crowd.onContact = (...args) => contacts.push(args);
+    crowd.setValue(11);
+    assert.equal(crowd.leaving.filter(l => l.duel).length, 2);
+    const m = new T.Matrix4(), p = new T.Vector3(); let highest = 0, t = 0;
+    for (let frame = 0; frame < 60; frame++) {
+      t += 1 / 60; crowd.update(1 / 60, t);
+      assert.equal(crowd.batches[0].mesh.count, 1 + crowd.leaving.length);
+      for (let i = 0; i < crowd.batches[0].mesh.count; i++) {
+        crowd.batches[0].mesh.getMatrixAt(i, m); assert(m.elements.every(Number.isFinite));
+        highest = Math.max(highest, p.setFromMatrixPosition(m).y);
+      }
+      if (frame === 8) assert.equal(contacts.length, 0, 'the charge must be visible before the collision');
+    }
+    assert.equal(contacts.length, 2, 'each fallen character collides exactly once');
+    for (const [x, z, scale] of contacts) {
+      assert(Math.abs(z - crowd.front.z) < .3 && Math.abs(x) < crowd.radius, 'collisions happen at the line');
+      assert.equal(scale, 1);
+    }
+    assert(highest > .8, 'the fallen must be thrown clear of the crowd');
+    assert.equal(crowd.leaving.length, 0);
+    assert.deepEqual(Array.from(crowd.batches, b => b.mesh.count), [1, 1, 0, 0]);
+    // A bigger one that breaks into smaller ones is not thrown, and the busiest fights stay bounded.
+    crowd.setValue(20, { instant: true }); crowd.setValue(19);
+    assert.equal(crowd.leaving.filter(l => l.duel).length, 0);
+    for (let n = 30999; n > 30000; n -= 37) crowd.setValue(n);
+    assert(crowd.leaving.length <= 60 && crowd.leaving.filter(l => l.duel).length <= 18);
+    crowd.update(1 / 60, t);
+    for (const batch of crowd.batches) assert(batch.mesh.count <= batch.mesh.instanceMatrix.count);
+  }
+  sandbox.Fx.fling('penguin', 0, 0, 1); sandbox.Fx.fling('crab', 0, 0, -1); sandbox.Fx.update(1 / 60);
+  assert.equal(sandbox.scene.children.filter(o => o.count === 1).length, 2, 'one tumbling body of each kind');
 });
