@@ -1,7 +1,7 @@
 /* Layout: full-bleed 3D stage; HUD pinned to the top edge, panels docked at the bottom. Single committed look. */
 :root {
-  --sky-top: #3f9be0;
-  --sky-low: #e3f4fb;
+  --sky-top: #74c9eb;
+  --sky-low: #dff6fa;
   --ink: #1c2541;
   --paper: #fff8e7;
   --sun: #ffd23f;
@@ -191,3 +191,4 @@ button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { .pg-w, .bobber, .aur, .tw, .pop { animation: none; } }
 #fail { position: absolute; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; background: var(--ink); color: var(--paper); font-size: 16px; line-height: 1.6; }
 @media (prefers-reduced-motion: reduce) { .floater { animation-duration: .01s; } }
+

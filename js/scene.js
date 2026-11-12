@@ -24,7 +24,7 @@ function gateTex(g) {
 }
 
 /* ---------- Level objects ---------- */
-let level = null, levelGroup = null, gates = [], foes = [], hazards = [];
+let level = null, levelGroup = null, gates = [], foes = [], hazards = [], iceScenery = null;
 const SEA_Y = -1.4;
 const C = hex => new THREE.Color(hex).convertSRGBToLinear();
 const lam = (hex, flat) => new THREE.MeshLambertMaterial({ color: C(hex), flatShading: !!flat });
@@ -63,21 +63,11 @@ function sculpt(g, amtXZ, amtY, seed, paint, shape) {
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return g;
 }
-const ICE_SIDE = [0xd6eefa, 0xbfe3f6, 0xa6d6f1], TEAL = 0x63cbdc;
-const icePaint = water => (cy, ny, r) => cy < water ? TEAL : ny > 0.55 ? 0xffffff : ICE_SIDE[Math.floor(r * 3)];
-// Three iceberg shapes: lumpy, tapered towards the top, flat at the waterline, snow on upward faces.
-const BERGS = [3.1, 7.7, 12.3].map(seed => {
-  const g = sculpt(new THREE.SphereGeometry(1, 7, 5), 0.75, 0.5, seed, icePaint(-0.02),
-    (x, y, z) => { const t = 1 - 0.38 * Math.max(0, y); return [x * t, y > 0 ? y * 1.7 : y * 0.22, z * t]; });
-  g.translate(0, 0.2, 0);
-  return g;
-});
-const FLOE = sculpt(new THREE.CylinderGeometry(1, 1.1, 0.5, 9), 0.4, 0, 5.5, icePaint(-0.05));
-const ICE_TINTS = [0xffffff, 0xf0f9fe, 0xdcf0fb];
-const SHARED = new Set([...BERGS, FLOE]);
+const TEAL = 0x63cbdc;
+const SHARED = new Set();
 const SNOWMAN = merge([
-  ball(0.75, 1, 0.9, 1, 0, 0.62, 0, SNOW, 12), ball(0.52, 1, 0.95, 1, 0, 1.55, 0, SNOW, 12), ball(0.36, 1, 1, 1, 0, 2.25, 0, SNOW, 12),
-  ball(0.4, 1, 0.25, 1, 0, 1.97, 0, CRAB, 10), cone(0.07, 0.36, Math.PI / 2, 0, 2.25, 0.46, BEAK),
+  ball(0.75, 1, 0.9, 1, 0, 0.62, 0, 0xffffff, 12), ball(0.52, 1, 0.95, 1, 0, 1.55, 0, 0xffffff, 12), ball(0.36, 1, 1, 1, 0, 2.25, 0, 0xffffff, 12),
+  ball(0.4, 1, 0.25, 1, 0, 1.97, 0, 0xf23d4f, 10), cone(0.07, 0.36, Math.PI / 2, 0, 2.25, 0.46, 0xff9f1c),
   ball(0.05, 1, 1, 1, -0.13, 2.37, 0.31, 0x10162e, 6), ball(0.05, 1, 1, 1, 0.13, 2.37, 0.31, 0x10162e, 6),
   ball(0.06, 1, 1, 1, 0, 1.7, 0.5, 0x10162e, 6), ball(0.06, 1, 1, 1, 0, 1.4, 0.5, 0x10162e, 6),
   ...[-1, 1].flatMap(sd => {
@@ -89,7 +79,6 @@ const SNOWMAN = merge([
   (() => { const brim = new THREE.CylinderGeometry(0.4, 0.4, 0.05, 12); brim.translate(0, 2.56, 0); return tint(brim, 0x1c2541); })()
 ]);
 SHARED.add(SNOWMAN);
-let foamTex = null;
 // One cloth shape shared by every flag; its vertices are rippled each frame so all flags wave in the same wind.
 const FLAG_GEO = new THREE.PlaneGeometry(0.95, 0.52, 7, 1); FLAG_GEO.translate(0.475, 0, 0);
 SHARED.add(FLAG_GEO);
@@ -103,10 +92,13 @@ function waveFlags(t) {
 function disposeLevel() {
   if (!levelGroup) return;
   levelGroup.traverse(o => {
-    if (o.geometry && !SHARED.has(o.geometry)) o.geometry.dispose();
-    if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
+    if (o.geometry && !SHARED.has(o.geometry) && !IceEnvironment.isShared(o.geometry)) o.geometry.dispose();
+    if (o.material && !IceEnvironment.isShared(o.material)) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
+    if (o.customDepthMaterial) o.customDepthMaterial.dispose();
+    if (o.isInstancedMesh) o.dispose();
   });
   scene.remove(levelGroup);
+  iceScenery = null;
 }
 function box(w, h, d, color, x, y, z) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), lam(color));
@@ -125,120 +117,34 @@ function flag(x, y, z, dir) {
   g.position.set(x, 0, z);
   return g;
 }
-// Draw n instances; place(i, dummy) positions each one and returns its tint.
-function scatter(geo, mat, n, place) {
-  const m = new THREE.InstancedMesh(geo, mat, n);
-  for (let i = 0; i < n; i++) {
-    const tint = place(i, dummy);
-    dummy.updateMatrix();
-    m.setMatrixAt(i, dummy.matrix);
-    m.setColorAt(i, tmpCol.copy(C(tint)));
-  }
-  dummy.scale.set(1, 1, 1); dummy.rotation.set(0, 0, 0);
-  m.frustumCulled = false;
-  levelGroup.add(m);
-  return m;
-}
-
 function buildLevel() {
   disposeLevel();
   levelGroup = new THREE.Group(); scene.add(levelGroup);
   gates = []; foes = []; hazards = [];
   level = genLevel(G.stage);
   const L = -level.bossZ + 50, midZ = -L / 2 + 20, dr = mulberry32(level.level * 31 + 7);
-  const pickTint = () => ICE_TINTS[Math.floor(dr() * ICE_TINTS.length)];
   const flat = m => { m.userData.ground = true; return m; };
 
-  // The road is a long ice floe: glossy cracked ice on top, a teal ledge at the waterline, foam where it meets the sea
-  const roadTex = canvasTex(256, 256, (ctx, w, h) => {
-    ctx.fillStyle = '#cfe9f7'; ctx.fillRect(0, 0, w, h);
-    const r = mulberry32(99);
-    ctx.fillStyle = 'rgba(255,255,255,.6)';
-    for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.ellipse(r() * w, r() * h, 20 + r() * 40, 8 + r() * 14, r() * 3, 0, 6.3); ctx.fill(); }
-    ctx.strokeStyle = '#9fcfe8'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
-    for (let i = 0; i < 7; i++) {
-      let x = r() * w, y = r() * h;
-      ctx.beginPath(); ctx.moveTo(x, y);
-      for (let k = 0; k < 4; k++) { x += (r() - 0.5) * 70; y += (r() - 0.5) * 70; ctx.lineTo(x, y); }
-      ctx.stroke();
-    }
-  });
-  roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping;
-  roadTex.repeat.set(1, L / 10);
-  const road = flat(new THREE.Mesh(new THREE.PlaneGeometry(W * 2, L),
-    new THREE.MeshPhongMaterial({ map: roadTex, shininess: 90, specular: C(0x2a4f6c) })));
-  road.rotation.x = -Math.PI / 2; road.position.z = midZ;
+  // A single continuous snow-capped slab; the ten-unit playing lane stays flat.
+  const roadWidth = W * 2 + 2.6;
+  const road = IceEnvironment.road(roadWidth, L); road.position.z = midZ;
   levelGroup.add(road);
-  levelGroup.add(box(W * 2 + 2, 1.4, L, 0xbfe3f6, 0, -0.71, midZ), box(W * 2 + 3.2, 0.5, L, TEAL, 0, SEA_Y - 0.08, midZ));
-  levelGroup.add(box(1, 0.3, L, 0xffffff, -W - 0.5, 0.08, midZ), box(1, 0.3, L, 0xffffff, W + 0.5, 0.08, midZ));
-  foamTex = canvasTex(64, 128, (ctx, w, h) => {
-    for (let y = 0; y < h; y++) {
-      const reach = w * (0.55 + 0.25 * Math.sin(y / h * 6.283 * 2) + 0.12 * Math.sin(y / h * 6.283 * 5));
-      const gr = ctx.createLinearGradient(0, 0, reach, 0);
-      gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(0.5, 'rgba(235,250,255,.55)'); gr.addColorStop(1, 'rgba(235,250,255,0)');
-      ctx.fillStyle = gr; ctx.fillRect(0, y, reach, 1);
-    }
-  });
-  foamTex.wrapT = THREE.RepeatWrapping; foamTex.repeat.set(1, L / 9);
-  for (const side of [-1, 1]) {
-    const foam = new THREE.Mesh(new THREE.PlaneGeometry(2.2, L), new THREE.MeshBasicMaterial({ map: foamTex, transparent: true, depthWrite: false }));
-    foam.rotation.x = -Math.PI / 2; foam.scale.x = side;
-    foam.position.set(side * (W + 1.6 + 1.1), SEA_Y + 0.05, midZ);
-    foam.material.side = THREE.DoubleSide;
-    levelGroup.add(foam);
-  }
-  const lumps = Math.floor(L / 2.4) * 2;
-  scatter(new THREE.SphereGeometry(0.6, 7, 5), lam(0xffffff, true), lumps, (i, d) => {
-    d.rotation.set(0, dr() * 6.283, 0);
-    d.position.set((i % 2 ? 1 : -1) * (W + 0.5 + (dr() - 0.5) * 0.3), 0.15, 20 - Math.floor(i / 2) * 2.4 - dr());
-    d.scale.set(0.8 + dr() * 0.7, 0.5 + dr() * 0.5, 0.8 + dr() * 0.9);
-    return 0xffffff;
-  });
-
-  // Icebergs and flat floes drifting on the sea, each with foam and a glow of submerged ice around it
-  const spots = [];
-  const bergs = Math.floor(L / 6), per = Math.ceil(bergs / BERGS.length);
-  BERGS.forEach((geo, gi) => scatter(geo, iceMat(), per, (i, d) => {
-    const n = i * BERGS.length + gi, sc = 2 + dr() * 6, sz = sc * (0.7 + dr() * 0.6);
-    d.rotation.set(0, dr() * 6.283, 0);
-    d.position.set((n % 2 ? 1 : -1) * (10 + Math.max(sc, sz) * 1.5 + dr() * 44), SEA_Y - 0.1, 30 - (n / bergs) * (L + 50));
-    d.scale.set(sc, sc * (0.6 + dr() * 0.9), sz);
-    spots.push([d.position.x, d.position.z, Math.max(sc, sz) * 1.5]);
-    return pickTint();
-  }));
-  const floes = Math.floor(L / 5);
-  scatter(FLOE, iceMat(), floes, (i, d) => {
-    const sx = 1.2 + dr() * 3.5, sz = 1.2 + dr() * 3.5;
-    d.rotation.set(0, dr() * 6.283, 0);
-    d.position.set((i % 2 ? 1 : -1) * (9.5 + dr() * 42), SEA_Y + 0.12, 30 - (i / floes) * (L + 50));
-    d.scale.set(sx, 1, sz);
-    spots.push([d.position.x, d.position.z, Math.max(sx, sz) * 1.55]);
-    return pickTint();
-  });
-  const haloTex = canvasTex(128, 128, (ctx, w) => {
-    const gr = ctx.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
-    gr.addColorStop(0, 'rgba(110,215,228,.75)'); gr.addColorStop(0.6, 'rgba(110,215,228,.6)');
-    gr.addColorStop(0.74, 'rgba(255,255,255,.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = gr; ctx.fillRect(0, 0, w, w);
-  });
-  const haloGeo = new THREE.CircleGeometry(1, 20); haloGeo.rotateX(-Math.PI / 2);
-  scatter(haloGeo, new THREE.MeshBasicMaterial({ map: haloTex, transparent: true, depthWrite: false }), spots.length, (i, d) => {
-    d.rotation.set(0, 0, 0);
-    d.position.set(spots[i][0], SEA_Y + 0.03 + (i % 5) * 0.002, spots[i][1]);
-    d.scale.set(spots[i][2], 1, spots[i][2]);
-    return 0xffffff;
-  });
-
-  // Snowmen watching from their own floes
-  const men = Math.max(2, Math.floor(L / 45));
-  for (let i = 0; i < men; i++) {
-    const side = i % 2 ? 1 : -1, x = side * (W + 4.6), z = -(22 + i * 45 + dr() * 14);
-    const base = new THREE.Mesh(sculpt(new THREE.CylinderGeometry(2.4, 2.7, 1.4, 9), 0.25, 0, i + 1.5, icePaint(-0.45)), iceMat());
-    base.position.set(x, -0.71, z);
+  // Spectators use the same rounded floes as the rest of the environment.
+  const reserved = [], men = Math.max(2, Math.floor(L / 65)), sr = mulberry32(level.level * 3001 + 41);
+  const spectatorRadius = IceEnvironment.radius('spectator') + .1, finishRadius = IceEnvironment.radius('finish') + .1;
+  for (let attempt = 0; reserved.length < men && attempt < men * 40; attempt++) {
+    const side = sr() < .5 ? -1 : 1, x = side * (W + 3 + spectatorRadius + sr() * 8), z = -(20 + sr() * (L - 78));
+    if (Math.hypot(x, z - level.bossZ) < spectatorRadius + finishRadius + 1.2) continue;
+    if (reserved.some(s => Math.hypot(x - s.x, z - s.z) < spectatorRadius + s.radius + 6)) continue;
+    const base = IceEnvironment.floe('spectator'); base.position.set(x, -.015, z);
     const man = new THREE.Mesh(SNOWMAN, new THREE.MeshLambertMaterial({ vertexColors: true }));
-    man.position.set(x, 0, z); man.rotation.y = -side * 0.7;
-    levelGroup.add(base, man);
+    man.position.set(x, 0, z); man.rotation.y = -side * .7 + (sr() - .5) * .6;
+    levelGroup.add(base, man); reserved.push({ x, z, radius: spectatorRadius });
   }
+  // Separate scenery randomness from gates/hazard decoration, with a stable seed per stage.
+  iceScenery = IceEnvironment.driftField({ length: L, halfWidth: W, seaY: SEA_Y,
+    random: mulberry32(level.level * 6197 + 73), reserved: [...reserved, { x: 0, z: level.bossZ, radius: finishRadius }] });
+  levelGroup.add(iceScenery.root);
 
   for (const s of level.segs) {
     if (s.kind === 'gate') {
@@ -308,8 +214,9 @@ function buildLevel() {
   }
 
   // Finish: a wide round floe for the boss group, with an igloo camp behind it
-  const pad = flat(new THREE.Mesh(sculpt(new THREE.CylinderGeometry(9, 9.7, 1.4, 14), 0.1, 0, 8.8, icePaint(-0.45)), iceMat()));
-  pad.position.set(0, -0.68, level.bossZ);
+  const pad = IceEnvironment.floe('finish');
+  pad.traverse(o => { if (o.isMesh) o.userData.ground = true; });
+  pad.position.set(0, -.025, level.bossZ);
   const brick = canvasTex(512, 256, (ctx, w, h) => {
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
     ctx.strokeStyle = '#b4d4ea'; ctx.lineWidth = 4;
@@ -333,6 +240,14 @@ function buildLevel() {
   levelGroup.add(pad, igloo, tunnel, door, lip, flag(4.2, 4.6, level.bossZ - 12, 1));
   addFoe(0, level.bossZ, level.boss, 150, true);
 
+  // Contact contours follow the actual rounded/fractured outlines at the waterline.
+  const contours = [water.outline(road.userData.shoreline, { z: midZ })];
+  for (const e of iceScenery.placements) contours.push(water.outline(IceEnvironment.outline(e.variant), e));
+  for (const s of reserved) contours.push(water.outline(IceEnvironment.outline('spectator'), { x: s.x, z: s.z, scale: .96 }));
+  contours.push(water.outline(IceEnvironment.outline('finish'), { z: level.bossZ, scale: .96 }));
+  levelGroup.add(water.createContacts(contours));
+
+
   // Shadows: flat ground only receives, see-through things do neither, everything else does both
   levelGroup.traverse(o => {
     if (!o.isMesh || o.userData.crowd || o.material.transparent) return;
@@ -343,36 +258,11 @@ function buildLevel() {
 
 /* ---------- Scenery that follows the camera: sea, snowy mountains, falling snow ---------- */
 const farGroup = new THREE.Group(); scene.add(farGroup);
-// Tileable wave strokes: every stroke is drawn nine times so it wraps cleanly at the edges
-function waves(ctx, w, n, seed, styles, width) {
-  const r = mulberry32(seed);
-  ctx.lineCap = 'round'; ctx.lineWidth = width;
-  for (let i = 0; i < n; i++) {
-    const x = r() * w, y = r() * w, len = 18 + r() * 46, bend = (r() - 0.5) * 14;
-    ctx.strokeStyle = styles[i % styles.length];
-    for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
-      ctx.beginPath(); ctx.moveTo(x + ox * w, y + oy * w);
-      ctx.quadraticCurveTo(x + ox * w + len / 2, y + oy * w + bend, x + ox * w + len, y + oy * w);
-      ctx.stroke();
-    }
-  }
-}
-const SEA = 700, SEA_REP = 46, SHINE_REP = 29;
-const seaTex = canvasTex(256, 256, (ctx, w) => {
-  ctx.fillStyle = '#16659e'; ctx.fillRect(0, 0, w, w);
-  waves(ctx, w, 46, 11, ['rgba(92,170,222,.5)', 'rgba(9,66,116,.45)', 'rgba(60,140,200,.4)'], 3.5);
-});
-const shineTex = canvasTex(256, 256, (ctx, w) => waves(ctx, w, 30, 23, ['rgba(255,255,255,.55)', 'rgba(200,236,255,.4)'], 1.6));
-seaTex.wrapS = seaTex.wrapT = shineTex.wrapS = shineTex.wrapT = THREE.RepeatWrapping;
-seaTex.repeat.set(SEA_REP, SEA_REP); shineTex.repeat.set(SHINE_REP, SHINE_REP);
-const sea = new THREE.Mesh(new THREE.PlaneGeometry(SEA, SEA), new THREE.MeshPhongMaterial({ map: seaTex, shininess: 120, specular: C(0x6f9fc4) }));
-sea.rotation.x = -Math.PI / 2; sea.position.set(0, SEA_Y, -150); sea.receiveShadow = true;
-const shine = new THREE.Mesh(new THREE.PlaneGeometry(SEA, SEA), new THREE.MeshBasicMaterial({ map: shineTex, transparent: true, depthWrite: false }));
-shine.rotation.x = -Math.PI / 2; shine.position.set(0, SEA_Y + 0.015, -150);
-farGroup.add(sea, shine);
+const water = createStylizedWater(THREE, SEA_Y);
+farGroup.add(water.mesh);
 {
   let g = new THREE.ConeGeometry(1, 1, 6, 1); g.translate(0, 0.5, 0); g = g.toNonIndexed();
-  const n = g.attributes.position.count, col = new Float32Array(n * 3), top = C(0xffffff), low = C(0xa9cfe9);
+  const n = g.attributes.position.count, col = new Float32Array(n * 3), top = C(0xffffff), low = C(0xb2d9ee);
   for (let i = 0; i < n; i++) { const c = g.attributes.position.getY(i) > 0.5 ? top : low; col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.computeVertexNormals();
@@ -398,15 +288,17 @@ flakes.frustumCulled = false;
 farGroup.add(flakes);
 function updateFar(dt, z, t, moving) {
   farGroup.position.z = z;
-  // The sea sheet travels with the camera; shifting its texture the other way keeps the waves fixed in the world while they drift.
+  // World-space wave coordinates remain anchored as the camera advances.
   const drift = calm ? 0 : t;
-  seaTex.offset.set(drift * 0.012, -SEA_REP * z / SEA + drift * 0.02);
-  shineTex.offset.set(-drift * 0.02, -SHINE_REP * z / SEA - drift * 0.03);
-  if (foamTex) foamTex.offset.y = drift * 0.04;
+  water.update(t, calm);
   waveFlags(drift);
+  if (iceScenery) iceScenery.update(t, z, calm);
   sun.target.position.set(0, 0, z - 24);
   sun.position.set(22, 40, z - 54);
   sun.target.updateMatrixWorld();
+  fill.position.set(-14 + camera.position.x * .25, 19, z + 24);
+  fill.target.position.set(0, 1, z - 8);
+  fill.target.updateMatrixWorld();
   for (let i = 0; i < FLAKES; i++) {
     const o = i * 3;
     flakePos[o] += Math.sin(t + i) * 0.4 * dt;
@@ -425,3 +317,4 @@ function addFoe(x, z, size, max, isBoss) {
   levelGroup.add(view.group);
   foes.push({ size, view, isBoss, dead: false, acc: 0, rate: 0 });
 }
+

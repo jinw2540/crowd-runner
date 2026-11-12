@@ -9,17 +9,20 @@ try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true 
 catch (e) { fail(); throw e; }
 renderer.outputEncoding = THREE.sRGBEncoding;
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(new THREE.Color(0xe3f4fb).convertSRGBToLinear(), 60, 150);
+scene.fog = new THREE.Fog(new THREE.Color(0xdff6fa).convertSRGBToLinear(), 75, 175);
 const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 300);
-// Warm low sun ahead and to the right; the sky fills shaded sides with blue.
-scene.add(new THREE.HemisphereLight(0xf4fbff, 0x86bdea, 0.78));
-const sun = new THREE.DirectionalLight(0xfff1d8, 0.7);
+// Soft daylight, blue-lilac shade and a camera-side fill keep the navy and coral readable.
+scene.add(new THREE.HemisphereLight(0xdceaff, 0x9ab0eb, 0.62));
+const sun = new THREE.DirectionalLight(0xfff2df, 0.54);
 sun.position.set(22, 40, -54);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.04;
 Object.assign(sun.shadow.camera, { left: -38, right: 38, top: 44, bottom: -44, near: 1, far: 130 });
 scene.add(sun, sun.target);
+const fill = new THREE.DirectionalLight(0xd5edff, 0.36);
+fill.position.set(-14, 19, 24); fill.target.position.set(0, 1, -8);
+scene.add(fill, fill.target);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // Real shadows are switched off automatically on devices that cannot keep up.
@@ -43,3 +46,4 @@ function resize() {
 if (window.ResizeObserver) new ResizeObserver(resize).observe(app);
 window.addEventListener('resize', resize);
 resize();
+

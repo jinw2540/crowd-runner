@@ -3,7 +3,7 @@
 'use strict';
 
 /* ---------- Crowd ---------- */
-// Characters are built once from simple shapes with per-vertex colours, then drawn as instances.
+// Shared scenery geometry helpers; characters are built by CharacterModels.
 function tint(g, hex) {
   if (g.index) g = g.toNonIndexed();
   const c = new THREE.Color(hex).convertSRGBToLinear(), n = g.attributes.position.count, a = new Float32Array(n * 3);
@@ -35,72 +35,8 @@ function merge(parts) {
   out.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return out;
 }
-const NAVY = 0x27408b, SNOW = 0xffffff, BEAK = 0xff9f1c, FOOT = 0xffc21a, CRAB = 0xf23d4f, CRAB_D = 0xc4213a;
-const CAP = 0x1c3070, GREY = 0xb4b4b4;   // GREY darkens whatever colour a scarf is tinted with
-const MODELS = {
-  // Penguin faces -z (away from the camera): navy back with a lighter saddle, white belly, yellow feet, stubby tail.
-  penguin: {
-    body: merge([
-      ball(0.24, 1, 1.25, 0.95, 0, 0.32, 0, NAVY, 12),
-      ball(0.2, 0.8, 0.95, 0.5, 0, 0.36, 0.14, 0x3a5bb5, 10),
-      ball(0.2, 0.96, 1.19, 0.6, 0, 0.3, -0.106, 0xaec8ec),
-      ball(0.2, 0.88, 1.12, 0.6, 0, 0.3, -0.12, SNOW),
-      ball(0.19, 1, 1, 1, 0, 0.67, 0, NAVY, 12),
-      ball(0.19, 1.03, 0.55, 1.03, 0, 0.74, 0.01, CAP, 12),
-      cone(0.04, 0.11, 0.35, 0, 0.87, 0.03, CAP),
-      ball(0.14, 1.05, 0.9, 0.5, 0, 0.66, -0.125, SNOW),
-      ball(0.04, 1, 0.7, 0.5, -0.105, 0.63, -0.168, 0xff9db5, 6),
-      ball(0.04, 1, 0.7, 0.5, 0.105, 0.63, -0.168, 0xff9db5, 6),
-      ball(0.026, 1, 1, 1, -0.07, 0.71, -0.185, 0x10162e, 6),
-      ball(0.026, 1, 1, 1, 0.07, 0.71, -0.185, 0x10162e, 6),
-      cone(0.05, 0.13, -Math.PI / 2, 0, 0.64, -0.23, BEAK),
-      cone(0.07, 0.16, Math.PI * 0.62, 0, 0.14, 0.24, NAVY),
-      ball(0.08, 1.05, 0.4, 1.5, -0.1, 0.03, -0.06, FOOT, 8),
-      ball(0.08, 1.05, 0.4, 1.5, 0.1, 0.03, -0.06, FOOT, 8)
-    ]),
-    limbs: merge([
-      ball(0.13, 0.3, 1.05, 0.62, -0.255, 0.36, 0, NAVY, 8),
-      ball(0.13, 0.3, 1.05, 0.62, 0.255, 0.36, 0, NAVY, 8),
-      ball(0.07, 0.3, 0.7, 0.7, -0.262, 0.27, 0, 0x3a5bb5, 6),
-      ball(0.07, 0.3, 0.7, 0.7, 0.262, 0.27, 0, 0x3a5bb5, 6)
-    ]),
-    // Knitted scarf: a striped ring, a striped tail down the back and a tassel
-    scarf: merge([
-      ball(0.205, 1, 0.3, 1, 0, 0.535, 0, SNOW, 12),
-      ball(0.2, 1, 0.09, 1, 0, 0.562, 0, GREY, 12),
-      ball(0.2, 1, 0.09, 1, 0, 0.508, 0, GREY, 12),
-      ball(0.065, 0.8, 0.75, 0.5, 0.06, 0.5, 0.2, SNOW, 6),
-      ball(0.065, 0.8, 0.75, 0.5, 0.06, 0.43, 0.215, GREY, 6),
-      ball(0.065, 0.8, 0.75, 0.5, 0.06, 0.36, 0.225, SNOW, 6),
-      ball(0.022, 1, 1.6, 1, 0.03, 0.29, 0.23, GREY, 5), ball(0.022, 1, 1.6, 1, 0.06, 0.285, 0.232, GREY, 5), ball(0.022, 1, 1.6, 1, 0.09, 0.29, 0.23, GREY, 5)
-    ])
-  },
-  // Crab faces +z (towards the camera): spotted shell with a darker rim, eyes on stalks, jointed legs, pincers that open.
-  crab: {
-    body: merge([
-      ball(0.24, 1.38, 0.4, 1.02, 0, 0.17, 0, CRAB_D, 12),
-      ball(0.24, 1.3, 0.62, 0.95, 0, 0.21, 0, CRAB, 12),
-      ball(0.05, 1.3, 0.4, 1, -0.11, 0.343, -0.04, 0xff8a94, 6), ball(0.05, 1.2, 0.4, 1, 0.12, 0.34, -0.07, 0xff8a94, 6), ball(0.04, 1.2, 0.4, 1, 0.01, 0.352, -0.12, 0xff8a94, 6),
-      ball(0.03, 1, 2.2, 1, -0.1, 0.35, 0.1, CRAB, 6), ball(0.03, 1, 2.2, 1, 0.1, 0.35, 0.1, CRAB, 6),
-      ball(0.065, 1, 1, 1, -0.1, 0.44, 0.1, SNOW, 8), ball(0.065, 1, 1, 1, 0.1, 0.44, 0.1, SNOW, 8),
-      ball(0.032, 1, 1, 1, -0.1, 0.45, 0.155, 0x10162e, 6), ball(0.032, 1, 1, 1, 0.1, 0.45, 0.155, 0x10162e, 6),
-      ...[-0.13, -0.01, 0.11].flatMap(z => [-1, 1].flatMap(sd => [
-        ball(0.04, 2, 0.75, 0.75, sd * 0.33, 0.14, z, CRAB_D, 6),
-        ball(0.035, 0.75, 2.1, 0.75, sd * 0.42, 0.07, z, CRAB_D, 6)
-      ])),
-      ball(0.06, 1.6, 0.8, 0.8, -0.31, 0.26, 0.1, CRAB_D, 6), ball(0.06, 1.6, 0.8, 0.8, 0.31, 0.26, 0.1, CRAB_D, 6),
-      ball(0.1, 1.15, 0.5, 0.85, -0.4, 0.3, 0.15, CRAB_D, 8), ball(0.1, 1.15, 0.5, 0.85, 0.4, 0.3, 0.15, CRAB_D, 8)
-    ]),
-    limbs: merge([
-      ball(0.1, 1.15, 0.55, 0.85, -0.4, 0.385, 0.15, CRAB, 8),
-      ball(0.1, 1.15, 0.55, 0.85, 0.4, 0.385, 0.15, CRAB, 8)
-    ])
-  }
-};
 const dummy = new THREE.Object3D();
 const tmpCol = new THREE.Color();
-const tmpV = new THREE.Vector3();
-const SCARVES = [0xffc21a, 0xff5a5f, 0x2fd0a8, 0xff8fc7].map(h => new THREE.Color(h).convertSRGBToLinear());
 const shadowGeo = new THREE.CircleGeometry(0.27, 12); shadowGeo.rotateX(-Math.PI / 2);
 
 /* Ten of a kind merge into one of the next size up, so a crowd is drawn as the digits of its count:
@@ -111,30 +47,6 @@ const MAX_TOP = 30;      // most of the largest size drawn at once
 const UNIT_CAP = 120;    // instances per mesh, including ones still animating out
 const LAYOUT_K = 1.85;   // how loosely the formation is packed
 
-// Headgear is built with its base at y = 0 and placed on the head each frame.
-const BEANIE = (() => {   // big penguins (10): knitted hat in the scarf's colour
-  const dome = new THREE.SphereGeometry(0.2, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1, 0.95, 1);
-  return merge([tint(dome, SNOW), ball(0.205, 1, 0.2, 1, 0, 0.01, 0, GREY, 10), ball(0.07, 1, 1, 1, 0, 0.22, 0, SNOW, 8)]);
-})();
-const CROWN = (() => {    // captains (100) and emperors (1000)
-  const parts = [], band = new THREE.CylinderGeometry(0.15, 0.13, 0.09, 10); band.translate(0, 0.045, 0);
-  parts.push(tint(band, 0xffc21a));
-  for (let i = 0; i < 5; i++) {
-    const a = i / 5 * 6.283, sp = new THREE.ConeGeometry(0.04, 0.11, 5);
-    sp.translate(Math.cos(a) * 0.125, 0.14, Math.sin(a) * 0.125);
-    parts.push(tint(sp, 0xffc21a), ball(0.022, 1, 1, 1, Math.cos(a) * 0.15, 0.045, Math.sin(a) * 0.15, 0xe5383b, 5));
-  }
-  return merge(parts);
-})();
-const CAPE = (() => {     // emperors only
-  const g = new THREE.ConeGeometry(0.23, 0.46, 8); g.scale(1, 1, 0.3); g.translate(0, -0.23, 0.19);
-  return tint(g, 0xd7263d);
-})();
-const ANCHOR = {
-  penguin: { beanie: [0.765, 0], crown: [0.8, 0], cape: [0.53, 0] },
-  crab: { crown: [0.3, -0.07] }
-};
-
 class CrowdView {
   constructor(kind) {
     this.kind = kind; this.crab = kind === 'crab';
@@ -143,29 +55,24 @@ class CrowdView {
     this.tilt = 0; this.tiltT = 0;    // lean into steering
     this.arms = 0; this.armsT = 0;    // wings or claws raised
     this.jump = 0; this.flinch = 0;   // one-shot reactions, 1 -> 0
+    this.impactAge = 1; this.impactStrength = 0; this.impactSide = 1; this.victoryHop = 0;
     this.value = 0;
     this.tiers = [[], [], [], []];    // live units by size
     this.leaving = [];                // units shrinking away or flying into a merge
     this.r = 0.3; this.tall = 1;
     this.group = new THREE.Group();
-    const mat = () => new THREE.MeshLambertMaterial({ vertexColors: true });
-    const mk = (geo, material) => {
-      const m = new THREE.InstancedMesh(geo, material || mat(), UNIT_CAP);
-      m.frustumCulled = false; m.count = 0; m.userData.crowd = true; m.castShadow = true;
-      this.group.add(m);
-      return m;
-    };
-    const M = MODELS[kind];
-    this.body = mk(M.body); this.limbs = mk(M.limbs);
-    this.shadow = mk(shadowGeo, new THREE.MeshBasicMaterial({ color: 0x0a2a4a, transparent: true, opacity: 0.2, depthWrite: false }));
-    this.shadow.castShadow = false;
-    this.scarf = M.scarf ? mk(M.scarf) : null;
-    this.beanie = this.crab ? null : mk(BEANIE);
-    this.crown = mk(CROWN);
-    this.cape = this.crab ? null : mk(CAPE);
-    for (const m of [this.scarf, this.beanie]) if (m) for (let i = 0; i < UNIT_CAP; i++) m.setColorAt(i, SCARVES[0]);
+    const animated = renderer.capabilities.vertexTextures &&
+      (renderer.capabilities.isWebGL2 || renderer.extensions.has('OES_texture_float'));
+    this.batches = [0, 1, 2, 3].map(tier => CharacterModels.batch(kind, tier, UNIT_CAP, animated));
+    this.batches.forEach(batch => this.group.add(batch.mesh));
+    this.shadow = new THREE.InstancedMesh(shadowGeo.clone(), new THREE.MeshBasicMaterial({ color: 0x0a2a4a, transparent: true, opacity: 0.2, depthWrite: false }), UNIT_CAP);
+    this.shadow.frustumCulled = false; this.shadow.count = 0; this.shadow.userData.crowd = true;
+    this.group.add(this.shadow);
   }
   get radius() { return this.r; }
+  impact(strength, side) { this.impactAge = 0; this.impactStrength = clamp(strength, 0, 1); this.impactSide = side; }
+  celebrateImpact() { this.victoryHop = 1; }
+  resetImpact() { this.impactAge = 1; this.impactStrength = 0; this.victoryHop = 0; }
   footprint(tier) { return 0.28 * TIER_SCALE[tier] * (this.crab ? 1.2 : 1); }
   compose(n) {
     n = Math.max(0, Math.floor(n));
@@ -199,8 +106,7 @@ class CrowdView {
         const u = {
           tier: t, ox: x, oz: z, tx: x, tz: z, wx: 0, wz: 0, fr: this.footprint(t),
           ph: Math.random() * 6.283, sc: opts.instant ? 1 : 0.15 - delay * 5,
-          sz: t ? 0.95 + Math.random() * 0.1 : 0.84 + Math.random() * 0.36,
-          scarf: Math.floor(Math.random() * SCARVES.length)
+          sz: t ? 0.95 + Math.random() * 0.1 : 0.84 + Math.random() * 0.36
         };
         list.push(u); added.push(u);
       }
@@ -222,7 +128,7 @@ class CrowdView {
       u.tx = Math.cos(a) * r; u.tz = Math.sin(a) * r;
       acc += fr * fr; i++;
       far = Math.max(far, r + fr);
-      tall = Math.max(tall, (this.crab ? 0.5 : 0.9) * TIER_SCALE[t] * SIZE);
+      tall = Math.max(tall, this.batches[t].asset.height * TIER_SCALE[t] * SIZE);
     }
     this.r = far; this.tall = tall || 1;
   }
@@ -237,9 +143,13 @@ class CrowdView {
     this.arms += (this.armsT - this.arms) * Math.min(1, dt * 8);
     this.jump = Math.max(0, this.jump - dt / 0.42);
     this.flinch = Math.max(0, this.flinch - dt / 0.45);
+    this.impactAge = Math.min(1, this.impactAge + dt / .30);
+    this.victoryHop = Math.max(0, this.victoryHop - dt / .36);
     this._mode = this.mode || (this.hop >= 1 ? 'run' : 'idle');
     this._jumpY = this.jump > 0 ? Math.sin((1 - this.jump) * Math.PI) * 0.7 : 0;
-    this._n = 0; this._beanies = 0; this._crowns = 0; this._capes = 0;
+    this._n = 0; this._counts = [0, 0, 0, 0];
+    const animation = this._mode === 'cheer' ? 'cheer' : this.arms > 0.5 ? 'wave' : this._mode;
+    this.batches.forEach(batch => batch.update(dt, t, animation));
     const k = 1 - Math.exp(-dt * 7);
     for (const list of this.tiers) for (const u of list) {
       u.ox += (u.tx - u.ox) * k; u.oz += (u.tz - u.oz) * k;
@@ -254,59 +164,41 @@ class CrowdView {
       this.draw(u, 1 - l.t, t);
     }
     dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
-    const flush = (m, n) => { if (!m) return; m.count = n; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; };
-    flush(this.body, this._n); flush(this.limbs, this._n); flush(this.shadow, this._n); flush(this.scarf, this._n);
-    flush(this.beanie, this._beanies); flush(this.crown, this._crowns); flush(this.cape, this._capes);
+    this.batches.forEach((batch, tier) => batch.flush(this._counts[tier]));
+    this.shadow.count = this._n; this.shadow.instanceMatrix.needsUpdate = true;
     this.shadow.visible = !Q.shadows;
   }
   // Write one unit into the instanced meshes. grow is 0..1 for popping in and shrinking away.
   draw(u, grow, t) {
     const i = this._n;
     if (i >= UNIT_CAP) return;
-    const crab = this.crab, tier = u.tier, arms = this.arms, flinch = this.flinch, hop = this.hop, ph = u.ph;
+    const crab = this.crab, tier = u.tier, flinch = this.flinch, ph = u.ph;
     const scale = SIZE * TIER_SCALE[tier] * u.sz, size = grow * scale * (1 - flinch * 0.18);
-    const beat = 10 / (1 + tier * 0.3);   // bigger ones move more slowly
-    // st is vertical stretch: below 1 squashes on landing, above 1 stretches in the air
-    let y = 0, rx = 0, ry = 0, rz = 0, st = 1, side = 0, flap = 0;
-    if (this._mode === 'run') {
-      const w = Math.sin(t * beat + ph), up = Math.abs(w);
-      flap = 0.5 + 0.5 * Math.sin(t * beat * 2 + ph * 3);
-      if (crab) { side = w * 0.09; y = up * 0.05; st = 1 + (up - 0.5) * 0.16; rz = w * 0.08; }
-      else { y = up * 0.1; st = 1 + (up - 0.5) * 0.22; rz = w * 0.2 - this.tilt * 0.32; rx = -0.2 + flinch * 0.5; }
-    } else if (this._mode === 'cheer') {
+    // The authored rig supplies grounded steps and cloth motion. Only game reactions
+    // (steering, cheering and hits) transform the complete character here.
+    let y = 0, rx = flinch * 0.25, ry = 0, rz = 0, st = 1;
+    if (this._mode === 'run') rz = -this.tilt * 0.18;
+    else if (this._mode === 'cheer') {
       const up = Math.abs(Math.sin(t * 7 / (1 + tier * 0.2) + ph));
-      y = up * 0.55; st = 1 + (up - 0.4) * 0.28; ry = t * 5 / (1 + tier * 0.4) + ph; flap = 1;
-    } else {
-      st = 1 + Math.sin(t * 2.2 + ph) * 0.035;
-      ry = Math.sin(t * 0.7 + ph * 2) * (crab ? 0.2 : 0.55);
-      if (Math.sin(t * 0.9 + ph * 1.7) > 0.85) flap = 0.5 + 0.5 * Math.sin(t * 26);
-    }
+      y = up * 0.4; st = 1 + (up - 0.4) * 0.12; ry = t * 2 / (1 + tier * 0.4) + ph;
+    } else ry = Math.sin(t * 0.7 + ph * 2) * (crab ? 0.1 : 0.2);
+    // A brief lunge/recoil is visual only; wx/wz below remain the collision positions.
+    const impact = Math.sin(this.impactAge * Math.PI) * this.impactStrength;
+    const push = Math.sin(this.impactAge * Math.PI * 2) * this.impactStrength;
+    rx += (crab ? 1 : -1) * push * .11;
+    rz += impact * this.impactSide * .085 * (.8 + .2 * Math.sin(ph));
+    y += impact * .025; st *= 1 - impact * .055;
+    if (this.victoryHop > 0) y += Math.sin((1 - this.victoryHop) * Math.PI) * .10;
     if (this._jumpY > 0) { y += this._jumpY * (0.8 + (ph % 1) * 0.4); st += this._jumpY * 0.25; }
     const wide = 1 / Math.sqrt(st), edge = Math.min(W - 0.25, Math.max(0.25, W - u.fr * 0.6));
-    const x = u.wx = clamp(this.cx + u.ox, -edge, edge) + side * scale / SIZE, z = u.wz = this.cz + u.oz, yy = y * scale;
-    dummy.position.set(x, yy, z);
+    const x = u.wx = clamp(this.cx + u.ox, -edge, edge), z = u.wz = this.cz + u.oz, yy = y * scale;
+    dummy.position.set(x, yy, z + (crab ? 1 : -1) * push * .05 * scale);
     dummy.rotation.set(rx, ry, rz);
     dummy.scale.set(size * wide, size * st, size * wide);
     dummy.updateMatrix();
-    this.body.setMatrixAt(i, dummy.matrix);
-    if (this.scarf) { this.scarf.setMatrixAt(i, dummy.matrix); this.scarf.setColorAt(i, SCARVES[u.scarf]); }
-    // Headgear follows the head through the body's tilt and spin
-    const A = ANCHOR[this.kind];
-    const wear = (mesh, anchor, n) => {
-      tmpV.set(0, anchor[0], anchor[1]).applyMatrix4(dummy.matrix);
-      const px = dummy.position.x, py = dummy.position.y, pz = dummy.position.z;
-      dummy.position.copy(tmpV); dummy.updateMatrix();
-      mesh.setMatrixAt(n, dummy.matrix);
-      dummy.position.set(px, py, pz); dummy.updateMatrix();
-    };
-    if (tier === 1 && this.beanie) { this.beanie.setColorAt(this._beanies, SCARVES[u.scarf]); wear(this.beanie, A.beanie, this._beanies++); }
-    if (tier >= 2) wear(this.crown, A.crown, this._crowns++);
-    if (tier === 3 && this.cape) wear(this.cape, A.cape, this._capes++);
-    // Wings spread and lift; claws pinch and reach up.
-    if (crab) dummy.scale.set(size * wide, size * st * (1 + flap * 0.35 + arms * 0.3), size * wide);
-    else { dummy.scale.set(size * wide * (1 + flap * 0.3 + arms * 0.4), size * st, size * wide); dummy.position.y = yy + arms * 0.14 * size; }
-    dummy.updateMatrix();
-    this.limbs.setMatrixAt(i, dummy.matrix);
+    const batch = this.batches[tier], slot = this._counts[tier]++;
+    batch.mesh.setMatrixAt(slot, dummy.matrix);
+    batch.phase.setX(slot, ph / (Math.PI * 2));
     const sh = size * (crab ? 1.3 : 1) * Math.max(0.4, 1 - y * 0.8);
     dummy.position.set(x, 0.045, z); dummy.rotation.set(0, 0, 0); dummy.scale.set(sh, 1, sh);
     dummy.updateMatrix();
@@ -319,7 +211,8 @@ class CrowdView {
 const Fx = (() => {
   const PN = 160, GN = 30, P = [], Gh = [];
   const puffs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.13, 6, 5), new THREE.MeshBasicMaterial({ color: 0xffffff }), PN);
-  const ghosts = new THREE.InstancedMesh(MODELS.penguin.body, new THREE.MeshLambertMaterial({ vertexColors: true }), GN);
+  const ghosts = new THREE.InstancedMesh(CharacterModels.get('penguin', 0).still, new THREE.MeshLambertMaterial({ vertexColors: true }), GN);
+  ghosts.count = 0;
   puffs.frustumCulled = ghosts.frustumCulled = false;
   scene.add(puffs, ghosts);
   for (let i = 0; i < PN; i++) { P.push({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 1 }); puffs.setColorAt(i, tmpCol.set(0xffffff)); }
@@ -352,17 +245,20 @@ const Fx = (() => {
         } else dummy.scale.setScalar(0);
         dummy.updateMatrix(); puffs.setMatrixAt(i, dummy.matrix);
       }
+      let ghostCount = 0;
       for (let i = 0; i < GN; i++) {
         const g = Gh[i];
         if (g.life > 0) {
           g.life -= dt; g.vy -= 16 * dt; g.x += g.vx * dt; g.y += g.vy * dt; g.rot += dt * 14;
           dummy.position.set(g.x, g.y, g.z); dummy.rotation.set(0, 0, g.rot); dummy.scale.setScalar(SIZE * Math.max(0, Math.min(1, g.life / 0.25)));
-        } else dummy.scale.setScalar(0);
-        dummy.updateMatrix(); ghosts.setMatrixAt(i, dummy.matrix);
+          dummy.updateMatrix(); ghosts.setMatrixAt(ghostCount++, dummy.matrix);
+        }
       }
+      ghosts.count = ghostCount;
       dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
       puffs.instanceMatrix.needsUpdate = ghosts.instanceMatrix.needsUpdate = true;
       puffs.instanceColor.needsUpdate = true;
     }
   };
 })();
+

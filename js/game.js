@@ -17,6 +17,7 @@ function sync() { player.setValue(G.count); }
 function resetRun() {
   G.count = startCount(); G.x = 0; G.lastX = 0; G.z = 0; G.fight = null; G.pending = null;
   player.cx = 0; player.cz = 0; player.hop = 1; G.bigHit = 0; G.short = 0;
+  player.resetImpact(); Combat.reset();
   player.setValue(G.count, { instant: true });
   camPos.set(0, 9, 12);
 }
@@ -109,14 +110,14 @@ function floater(text, bad) {
   setTimeout(() => el.remove(), 850);
 }
 const pool = []; let used = 0;
-function tag(x, y, z, text, cls) {
+function tag(x, y, z, text, cls, offsetX = 0) {
   const p = toScreen(x, y, z); if (!p) return;
   let el = pool[used];
   if (!el) { el = document.createElement('div'); labels.appendChild(el); pool.push(el); }
   used++;
   el.className = 'tag ' + cls;
   if (el.textContent !== text) el.textContent = text;
-  el.style.transform = `translate(${p[0]}px,${p[1]}px) translate(-50%,-50%)`;
+  el.style.transform = `translate(${p[0] + offsetX}px,${p[1]}px) translate(-50%,-50%)`;
   el.hidden = false;
 }
 
@@ -196,18 +197,20 @@ function step(dt) {
         // When a boss fight is going to be close, its last few exchanges play out slowly
         f.tense = f.isBoss && Math.abs(G.count - f.size) <= closeCall(f.size) ? Math.max(4, Math.round(Math.min(G.count, f.size) * 0.08)) : 0;
         f.rate = Math.max(12, Math.min(G.count, f.size) / (f.isBoss ? 1.5 : 0.8));
+        Combat.begin(player, f.view);
       }
     }
     const f = G.fight;
     if (f) {
       f.acc += f.rate * dt * (Math.min(G.count, f.size) <= f.tense ? 0.22 : 1);
       const k = Math.min(Math.floor(f.acc), G.count, f.size);
-      if (k > 0) { f.acc -= k; G.count -= k; f.size -= k; Sfx.hit(); Fx.clash((G.x + f.view.cx) / 2, (G.z + f.view.cz) / 2, k); }
+      if (k > 0) { f.acc -= k; G.count -= k; f.size -= k; Combat.damage(player, f.view, k); }
       f.view.cx += (G.x - f.view.cx) * Math.min(1, dt * 4);
       f.view.setValue(f.size);
       sync();
       if (G.count <= 0) { G.short = f.isBoss ? f.size + 1 : 0; finish(false, f.isBoss ? '보스 무리가 더 많았어요' : '모두 쓰러졌어요'); return; }
       if (f.size <= 0) {
+        Combat.finish(player, f.view);
         f.dead = true; f.view.group.visible = false; G.fight = null;
         if (f.isBoss) { finish(true); return; }
       }
@@ -242,12 +245,13 @@ function frame(dt) {
   camPos.x += (tx - camPos.x) * k; camPos.y += (ty - camPos.y) * k; camPos.z += (tz - camPos.z) * k;
   camera.position.copy(camPos);
   camera.lookAt(tx, menu ? -4.5 : 0, G.z - 8);
+  Combat.update(dt, camera); Combat.shakeCamera(camera);
 
   used = 0;
-  if (G.count > 0) tag(G.x, player.tall * 1.6 + 1.2, G.z, String(G.count), 'me');
+  if (G.count > 0) tag(G.x, player.tall * 1.6 + 1.2, G.z, String(G.count), 'me', G.fight ? -50 : 0);
   for (const f of foes) {
     if (f.dead || f.view.cz < G.z - 75 || f.view.cz > G.z + 3) continue;
-    tag(f.view.cx, f.view.tall * 1.6 + 1.4, f.view.cz, String(f.size), 'foe');
+    tag(f.view.cx, f.view.tall * 1.6 + 1.4, f.view.cz, String(f.size), 'foe', G.fight === f ? 50 : 0);
   }
   for (let i = used; i < pool.length; i++) pool[i].hidden = true;
   if (G.state === 'running') $('barFill').style.width = (clamp(G.z / level.bossZ, 0, 1) * 100).toFixed(1) + '%';
@@ -265,3 +269,4 @@ function loop(now) {
   frame(dt);
   requestAnimationFrame(loop);
 }
+
