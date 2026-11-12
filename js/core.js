@@ -80,8 +80,19 @@ function genLevel(level) {
     const z = -(30 + i * SEG);
     if (kind === 'gate') {
       const a = good();
-      let b = rnd() < 0.45 ? good() : bad();
-      if (a.op === b.op && a.v === b.v) b = bad();
+      let b;
+      if (rnd() < 0.7) {
+        // Contested pair: both gates help, and on the best route their results differ by only 10-25%,
+        // so the right answer depends on how many penguins the player actually has.
+        const near = () => rnd() < 0.5 ? rf(0.75, 0.9) : rf(1.1, 1.25);
+        if (a.op === '×') b = { op: '+', v: Math.max(2, nice(best * (a.v - 1) * near())), good: true };
+        else if (mults < 4 && best >= 3 && best < 300 && rnd() < 0.5) {
+          mults++;
+          a.v = Math.max(2, nice(best * near()));   // an addition worth about as much as doubling
+          b = { op: '×', v: 2, good: true };
+        } else b = { op: '+', v: Math.max(2, nice(a.v * near())), good: true };
+        if (a.op === b.op && a.v === b.v) b.v += a.v > 40 ? 10 : a.v > 15 ? 5 : 1;
+      } else b = bad();
       best = Math.max(applyOp(best, a), applyOp(best, b));
       const flip = rnd() < 0.5;
       segs.push({ kind, z, left: flip ? b : a, right: flip ? a : b });
@@ -95,6 +106,8 @@ function genLevel(level) {
     }
     last = kind;
   }
-  const ratio = 0.4 + Math.min(level, 20) * 0.015;
+  // The boss is sized against the best possible route. The first three stages are forgiving;
+  // after that a wrong gate or two is enough to lose, and by stage 19 there is almost no slack.
+  const ratio = level <= 3 ? 0.5 : Math.min(0.9, 0.75 + (level - 4) * 0.01);
   return { level, segs, best, boss: Math.max(1, Math.floor(best * ratio)), bossZ: -(30 + n * SEG + 10) };
 }

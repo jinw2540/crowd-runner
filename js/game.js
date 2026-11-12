@@ -3,7 +3,7 @@
 'use strict';
 
 /* ---------- Game state ---------- */
-const G = { state: 'menu', stage: Save.data.level, nextStage: Save.data.level, count: 1, x: 0, lastX: 0, z: 0, t: 0, fight: null, bigHit: 0, endTimer: 0, pending: null, walkFrom: 0 };
+const G = { state: 'menu', stage: Save.data.level, nextStage: Save.data.level, count: 1, x: 0, lastX: 0, z: 0, t: 0, fight: null, bigHit: 0, short: 0, endTimer: 0, pending: null, walkFrom: 0 };
 const player = new CrowdView('penguin');
 scene.add(player.group);
 const keys = { l: false, r: false };
@@ -16,7 +16,7 @@ const costIncome = () => Math.round(40 * Math.pow(1.5, Save.data.upIncome));
 function sync() { player.setValue(G.count); }
 function resetRun() {
   G.count = startCount(); G.x = 0; G.lastX = 0; G.z = 0; G.fight = null; G.pending = null;
-  player.cx = 0; player.cz = 0; player.hop = 1; G.bigHit = 0;
+  player.cx = 0; player.cz = 0; player.hop = 1; G.bigHit = 0; G.short = 0;
   player.setValue(G.count, { instant: true });
   camPos.set(0, 9, 12);
 }
@@ -46,6 +46,8 @@ function startRun(rebuild) {
   $('menu').hidden = true; $('hud').hidden = false; $('result').hidden = true; $('map').hidden = true;
   refreshUI();
 }
+// A result within this many of the boss's size counts as a close call
+const closeCall = boss => Math.max(5, Math.round(boss * 0.15));
 function finish(won, reason) {
   if (G.state !== 'running') return;
   const d = Save.data;
@@ -53,7 +55,8 @@ function finish(won, reason) {
   if (won) {
     const replay = G.stage < d.level, st = starsFor(G.count, level);
     gain = Math.round((20 + G.stage * 6 + Math.min(G.count, 500) * 0.3) * incomeMult() * (replay ? 0.5 : 1));
-    G.pending = { title: '스테이지 ' + G.stage + ' 클리어', text: G.count.toLocaleString('ko-KR') + '명이 살아남았어요.', main: '다음 스테이지', stars: st, replay };
+    const close = G.count <= closeCall(level.boss);
+    G.pending = { title: '스테이지 ' + G.stage + ' 클리어', text: (close ? '아슬아슬했어요! ' : '') + G.count.toLocaleString('ko-KR') + '명이 살아남았어요.', main: '다음 스테이지', stars: st, replay };
     d.stars[G.stage] = Math.max(d.stars[G.stage] || 0, st);
     d.best[G.stage] = Math.max(d.best[G.stage] || 0, G.count);
     if (!replay) d.level++;
@@ -64,7 +67,12 @@ function finish(won, reason) {
   } else {
     const progress = clamp(G.z / level.bossZ, 0, 1);
     gain = Math.round((3 + progress * 10) * incomeMult());
-    G.pending = { title: reason, text: '업그레이드로 시작 인원을 늘리면 더 쉬워져요.', main: '다시 도전', stars: 0 };
+    // After a boss fight, say exactly how many more would have won it
+    const short = G.short, tip = '업그레이드로 시작 인원을 늘리면 더 쉬워져요.';
+    const text = !short ? tip
+      : short <= closeCall(level.boss) ? '아깝다! ' + short.toLocaleString('ko-KR') + '마리만 더 있었으면 이겼어요.'
+      : short.toLocaleString('ko-KR') + '마리가 모자랐어요. ' + tip;
+    G.pending = { title: reason, text, main: '다시 도전', stars: 0 };
     G.nextStage = G.stage; G.walkFrom = 0;
     Sfx.lose();
   }
@@ -185,18 +193,20 @@ function step(dt) {
       }
       if (!G.fight && gap < player.radius + f.view.radius + 0.8) {
         G.fight = f; f.acc = 0; f.view.hop = 1;
+        // When a boss fight is going to be close, its last few exchanges play out slowly
+        f.tense = f.isBoss && Math.abs(G.count - f.size) <= closeCall(f.size) ? Math.max(4, Math.round(Math.min(G.count, f.size) * 0.08)) : 0;
         f.rate = Math.max(12, Math.min(G.count, f.size) / (f.isBoss ? 1.5 : 0.8));
       }
     }
     const f = G.fight;
     if (f) {
-      f.acc += f.rate * dt;
+      f.acc += f.rate * dt * (Math.min(G.count, f.size) <= f.tense ? 0.22 : 1);
       const k = Math.min(Math.floor(f.acc), G.count, f.size);
       if (k > 0) { f.acc -= k; G.count -= k; f.size -= k; Sfx.hit(); Fx.clash((G.x + f.view.cx) / 2, (G.z + f.view.cz) / 2, k); }
       f.view.cx += (G.x - f.view.cx) * Math.min(1, dt * 4);
       f.view.setValue(f.size);
       sync();
-      if (G.count <= 0) { finish(false, f.isBoss ? '보스 무리가 더 많았어요' : '모두 쓰러졌어요'); return; }
+      if (G.count <= 0) { G.short = f.isBoss ? f.size + 1 : 0; finish(false, f.isBoss ? '보스 무리가 더 많았어요' : '모두 쓰러졌어요'); return; }
       if (f.size <= 0) {
         f.dead = true; f.view.group.visible = false; G.fight = null;
         if (f.isBoss) { finish(true); return; }
