@@ -130,15 +130,20 @@ function buildLevel() {
   const road = IceEnvironment.road(roadWidth, L); road.position.z = midZ;
   levelGroup.add(road);
   // Spectators use the same rounded floes as the rest of the environment.
-  const reserved = [], men = Math.max(2, Math.floor(L / 45));
-  for (let i = 0; i < men; i++) {
-    const side = i % 2 ? 1 : -1, x = side * (W + 6.3), z = -(22 + i * 45 + dr() * 14);
+  const reserved = [], men = Math.max(2, Math.floor(L / 65)), sr = mulberry32(level.level * 3001 + 41);
+  const spectatorRadius = IceEnvironment.radius('spectator') + .1, finishRadius = IceEnvironment.radius('finish') + .1;
+  for (let attempt = 0; reserved.length < men && attempt < men * 40; attempt++) {
+    const side = sr() < .5 ? -1 : 1, x = side * (W + 3 + spectatorRadius + sr() * 8), z = -(20 + sr() * (L - 78));
+    if (Math.hypot(x, z - level.bossZ) < spectatorRadius + finishRadius + 1.2) continue;
+    if (reserved.some(s => Math.hypot(x - s.x, z - s.z) < spectatorRadius + s.radius + 6)) continue;
     const base = IceEnvironment.floe('spectator'); base.position.set(x, -.015, z);
     const man = new THREE.Mesh(SNOWMAN, new THREE.MeshLambertMaterial({ vertexColors: true }));
-    man.position.set(x, 0, z); man.rotation.y = -side * .7;
-    levelGroup.add(base, man); reserved.push({ x, z, radius: 2.7 });
+    man.position.set(x, 0, z); man.rotation.y = -side * .7 + (sr() - .5) * .6;
+    levelGroup.add(base, man); reserved.push({ x, z, radius: spectatorRadius });
   }
-  iceScenery = IceEnvironment.driftField({ length: L, halfWidth: W, seaY: SEA_Y, random: dr, reserved });
+  // Separate scenery randomness from gates/hazard decoration, with a stable seed per stage.
+  iceScenery = IceEnvironment.driftField({ length: L, halfWidth: W, seaY: SEA_Y,
+    random: mulberry32(level.level * 6197 + 73), reserved: [...reserved, { x: 0, z: level.bossZ, radius: finishRadius }] });
   levelGroup.add(iceScenery.root);
 
   for (const s of level.segs) {

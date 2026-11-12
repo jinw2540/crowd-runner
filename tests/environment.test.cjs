@@ -75,3 +75,48 @@ test('drifting floes stay outside the road and spectator islands, with bounded m
   field.update(4, -150, true);
   assert.deepEqual(field.batches.filter(b => b.group.visible).map(b => Array.from(b.meshes[0].instanceMatrix.array)), before);
 });
+
+// Match the game's seeded source without relying on Math.random or wall-clock time.
+function seeded(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function scatterFixture(seed) {
+  const length = 210 + seed % 10 * 24;
+  const reserved = [{ x: 12.5, z: -45, radius: E.radius('spectator') + .1 }, { x: -17, z: -105, radius: E.radius('spectator') + .1 }, { x: 0, z: 50 - length, radius: E.radius('finish') + .1 }];
+  return { length, halfWidth: 5, seaY: -1.4, random: seeded(seed * 6197 + 73), reserved };
+}
+function releaseField(field) { field.root.traverse(o => { if (o.isInstancedMesh) o.dispose(); }); }
+
+test('scenery repeats for the same stage and changes for a different seed', () => {
+  const first = E.driftField(scatterFixture(7)), repeat = E.driftField(scatterFixture(7)), different = E.driftField(scatterFixture(8));
+  assert.deepEqual(first.placements, repeat.placements);
+  assert.deepEqual(first.clearings, repeat.clearings);
+  assert.notDeepEqual(first.placements, different.placements);
+  [first, repeat, different].forEach(releaseField);
+});
+
+test('random clusters retain clear water, size variety and safe separation across 40 seeds', () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    const options = scatterFixture(seed), field = E.driftField(options), floes = field.placements;
+    const small = floes.filter(e => e.size === 'small'), medium = floes.filter(e => e.size === 'medium'), large = floes.filter(e => e.size === 'large');
+    assert(small.length > medium.length && medium.length > large.length && large.length >= 2);
+    assert(floes.length < 80, 'keep the scene sparse and within the existing rendering budget');
+    assert(large.some(e => e.variant === 'spiky'));
+    assert(field.clearings.some(g => g.side === -1) && field.clearings.some(g => g.side === 1));
+    const clusters = new Map();
+    for (let i = 0; i < floes.length; i++) {
+      const e = floes[i];
+      if (e.cluster >= 0) clusters.set(e.cluster, (clusters.get(e.cluster) || 0) + 1);
+      assert(Math.abs(e.x) - e.radius >= 7.7 - 1e-9);
+      assert(e.z - e.radius >= 20 - options.length && e.z + e.radius <= 18);
+      if (e.size === 'large') assert(Math.abs(e.x) - e.radius >= 21 - 1e-9, 'large peaks belong offshore');
+      for (const other of [...floes.slice(i + 1), ...options.reserved]) {
+        assert(Math.hypot(e.x - other.x, e.z - other.z) >= e.radius + other.radius + .9 - 1e-9, `overlap in seed ${seed}`);
+      }
+      for (const g of field.clearings) if (Math.sign(e.x) === g.side && Math.abs(e.x) - e.radius < g.edge) {
+        assert(Math.abs(e.z - g.z) >= e.radius + g.halfLength, 'open-water pockets must remain clear');
+      }
+    }
+    for (const size of clusters.values()) assert(size >= 2 && size <= 4);
+    assert(clusters.size >= 4);
+    releaseField(field);
+  }
+});

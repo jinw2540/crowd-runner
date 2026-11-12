@@ -115,21 +115,80 @@ function floe(variant) { return groupFrom(asset(variant).parts, 'Soft ice ' + va
 function driftField({ length, halfWidth, seaY, random, reserved = [] }) {
   const root = new T.Group(); root.name = 'Drifting rounded and jagged floes';
   const groups = new Map(), placements = [], dummy = new T.Object3D();
-  function place(variant, side, z, far) {
-    const model = asset(variant), scale = far ? 1.3 + random() * .9 : .68 + random() * .36;
-    const radius = model.radius * scale;
-    let x = halfWidth + (far ? 17 + random() * 24 : 2.7 + random() * 2.6) + radius;
-    for (const spot of reserved) if (Math.abs(spot.z - z) < radius + spot.radius + 1 && Math.sign(spot.x) === side) x = Math.max(x, Math.abs(spot.x) + spot.radius + radius + 1);
-    const entry = { variant, x: side * x, y: seaY + model.info.thickness * scale * .68, z, scale, radius, angle: random() * Math.PI * 2, phase: random() * Math.PI * 2 };
-    placements.push(entry);
-    const key = Math.floor(z / 56) + ':' + variant;
-    if (!groups.has(key)) groups.set(key, { entries: [], model });
-    groups.get(key).entries.push(entry);
+  const clearings = [], clusters = [], minZ = 20 - length, maxZ = 18;
+  // Reserve irregular stretches of open near-shore water on each side.
+  // Leave the spectator islands and finish outside these quiet stretches.
+  for (const side of [-1, 1]) {
+    const count = length > 320 ? 2 : 1;
+    for (let i = 0; i < count; i++) for (let attempt = 0; attempt < 40; attempt++) {
+      const gap = { side, z: -48 - random() * Math.max(1, length - 112), halfLength: 9 + random() * 8, edge: halfWidth + 22 };
+      if (reserved.some(s => (Math.sign(s.x) === side || s.x === 0) && Math.abs(s.x) - s.radius < gap.edge && Math.abs(s.z - gap.z) < s.radius + gap.halfLength + 2)) continue;
+      if (clearings.some(g => g.side === side && Math.abs(g.z - gap.z) < g.halfLength + gap.halfLength + 8)) continue;
+      clearings.push(gap); break;
+    }
   }
-  const sequence = ['spiky', 'small', 'snowy', 'spiky', 'large', 'small'];
-  for (let row = 0, z = 12; z > 20 - length; row++, z -= 14) {
-    [-1, 1].forEach((side, i) => place(sequence[(row * 2 + i) % sequence.length], side, z + random() * 3, false));
-    if (row % 2 === 0) [-1, 1].forEach(side => place(row % 4 ? 'large' : 'spiky', side, z - 6, true));
+  function make(size, variant) {
+    if (!variant) variant = size === 'small' ? (random() < .84 ? 'small' : 'snowy')
+      : size === 'medium' ? (random() < .55 ? 'snowy' : 'large') : (random() < .6 ? 'spiky' : 'large');
+    const model = asset(variant);
+    const scale = size === 'small' ? (variant === 'small' ? .43 + random() * .6 : .4 + random() * .24)
+      : size === 'medium' ? (variant === 'snowy' ? .72 + random() * .38 : .62 + random() * .29) : .94 + random() * .85;
+    const thickness = model.info.thickness * scale;
+    // Keep tiny floes submerged even at the lowest swell plus the highest bob.
+    const freeboard = Math.min(thickness * .68, thickness - .13);
+    // The envelope includes the tiny horizontal movement caused by the bobbing tilt.
+    return { variant, size, scale, radius: model.radius * scale + .1, x: 0, z: 0,
+      y: seaY + freeboard, gap: .9 + random() * 1.2,
+      angle: random() * Math.PI * 2, phase: random() * Math.PI * 2, cluster: -1 };
+  }
+  function fits(e, trial = []) {
+    const side = Math.sign(e.x), edge = Math.abs(e.x) - e.radius;
+    if (edge < halfWidth + 2.7 || Math.abs(e.x) + e.radius > halfWidth + 58 || e.z - e.radius < minZ || e.z + e.radius > maxZ) return false;
+    if (e.size === 'large' && edge < halfWidth + 16) return false;
+    if (clearings.some(g => g.side === side && edge < g.edge && Math.abs(e.z - g.z) < e.radius + g.halfLength)) return false;
+    const overlaps = other => Math.hypot(e.x - other.x, e.z - other.z) < e.radius + other.radius + Math.max(e.gap, other.gap || 1.2);
+    return !reserved.some(overlaps) && !placements.some(overlaps) && !trial.some(overlaps);
+  }
+  function cluster(side, opening) {
+    const count = 2 + Math.floor(random() * 3);
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const first = make('small');
+      first.x = side * (halfWidth + (opening ? 6.5 + random() * 6.5 : 5 + random() * 21));
+      first.z = opening ? -18 - random() * 16 : minZ + 12 + random() * (length - 30);
+      if (!fits(first) || clusters.some(c => Math.hypot(c.x - first.x, c.z - first.z) < 21)) continue;
+      const trial = [first];
+      for (let i = 1; i < count; i++) for (let attempt = 0; attempt < 28; attempt++) {
+        const e = make('small'), parent = trial[Math.floor(random() * trial.length)];
+        const angle = random() * Math.PI * 2, distance = parent.radius + e.radius + Math.max(parent.gap, e.gap) + .1 + random() * 1.6;
+        e.x = parent.x + Math.cos(angle) * distance; e.z = parent.z + Math.sin(angle) * distance;
+        if (Math.sign(e.x) !== side || Math.hypot(e.x - first.x, e.z - first.z) > 11 || !fits(e, trial)) continue;
+        trial.push(e); break;
+      }
+      if (trial.length < 2) continue;
+      trial.forEach(e => { e.cluster = clusters.length; placements.push(e); });
+      clusters.push({ x: first.x, z: first.z, side }); return;
+    }
+  }
+  // Independent positions on each side: no rows, mirrored pairs or model sequence.
+  const openingSide = random() < .5 ? -1 : 1;
+  for (const side of [openingSide, -openingSide]) {
+    const count = Math.ceil(length / 78) + (random() < .35 ? 1 : 0);
+    for (let i = 0; i < count; i++) cluster(side, i === 0 && side === openingSide);
+  }
+  for (const size of ['medium', 'large']) {
+    const count = size === 'medium' ? Math.ceil(length / 45) : Math.max(2, Math.round(length / 140));
+    for (let i = 0; i < count; i++) for (let attempt = 0; attempt < 70; attempt++) {
+      const e = make(size, size === 'large' && i === 0 ? 'spiky' : undefined), side = random() < .5 ? -1 : 1;
+      e.x = side * (halfWidth + e.radius + (size === 'large' ? 16 + random() * (i === 0 ? 12 : 28) : 7 + random() * 29));
+      e.z = size === 'large' && i === 0 ? -46 - random() * 35 : minZ + e.radius + random() * (maxZ - minZ - e.radius * 2);
+      if (!fits(e)) continue;
+      placements.push(e); break;
+    }
+  }
+  for (const e of placements) {
+    const key = Math.floor(e.z / 56) + ':' + e.variant;
+    if (!groups.has(key)) groups.set(key, { entries: [], model: asset(e.variant) });
+    groups.get(key).entries.push(e);
   }
   const batches = [];
   for (const { entries, model } of groups.values()) {
@@ -157,8 +216,9 @@ function driftField({ length, halfWidth, seaY, random, reserved = [] }) {
     }
   }
   update(0, 0);
-  return { root, placements, batches, update };
+  return { root, placements, clearings, batches, update };
 }
 
-scope.IceEnvironment = { road, floe, driftField, outline: variant => asset(variant).outline.map(p => p.clone()), isShared: resource => shared.has(resource) };
+scope.IceEnvironment = { road, floe, driftField, radius: variant => asset(variant).radius,
+  outline: variant => asset(variant).outline.map(p => p.clone()), isShared: resource => shared.has(resource) };
 })(typeof window !== 'undefined' ? window : globalThis);
