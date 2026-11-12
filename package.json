@@ -1,0 +1,6 @@
+{
+  "name": "crowd-runner",
+  "private": true,
+  "scripts": { "test": "node --test tests/characters.test.cjs" },
+  "devDependencies": { "three": "0.149.0" }
+}

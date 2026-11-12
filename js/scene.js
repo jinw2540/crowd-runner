@@ -76,8 +76,8 @@ const FLOE = sculpt(new THREE.CylinderGeometry(1, 1.1, 0.5, 9), 0.4, 0, 5.5, ice
 const ICE_TINTS = [0xffffff, 0xf0f9fe, 0xdcf0fb];
 const SHARED = new Set([...BERGS, FLOE]);
 const SNOWMAN = merge([
-  ball(0.75, 1, 0.9, 1, 0, 0.62, 0, SNOW, 12), ball(0.52, 1, 0.95, 1, 0, 1.55, 0, SNOW, 12), ball(0.36, 1, 1, 1, 0, 2.25, 0, SNOW, 12),
-  ball(0.4, 1, 0.25, 1, 0, 1.97, 0, CRAB, 10), cone(0.07, 0.36, Math.PI / 2, 0, 2.25, 0.46, BEAK),
+  ball(0.75, 1, 0.9, 1, 0, 0.62, 0, 0xffffff, 12), ball(0.52, 1, 0.95, 1, 0, 1.55, 0, 0xffffff, 12), ball(0.36, 1, 1, 1, 0, 2.25, 0, 0xffffff, 12),
+  ball(0.4, 1, 0.25, 1, 0, 1.97, 0, 0xf23d4f, 10), cone(0.07, 0.36, Math.PI / 2, 0, 2.25, 0.46, 0xff9f1c),
   ball(0.05, 1, 1, 1, -0.13, 2.37, 0.31, 0x10162e, 6), ball(0.05, 1, 1, 1, 0.13, 2.37, 0.31, 0x10162e, 6),
   ball(0.06, 1, 1, 1, 0, 1.7, 0.5, 0x10162e, 6), ball(0.06, 1, 1, 1, 0, 1.4, 0.5, 0x10162e, 6),
   ...[-1, 1].flatMap(sd => {
@@ -105,6 +105,8 @@ function disposeLevel() {
   levelGroup.traverse(o => {
     if (o.geometry && !SHARED.has(o.geometry)) o.geometry.dispose();
     if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
+    if (o.customDepthMaterial) o.customDepthMaterial.dispose();
+    if (o.isInstancedMesh) o.dispose();
   });
   scene.remove(levelGroup);
 }
@@ -425,3 +427,4 @@ function addFoe(x, z, size, max, isBoss) {
   levelGroup.add(view.group);
   foes.push({ size, view, isBoss, dead: false, acc: 0, rate: 0 });
 }
+
