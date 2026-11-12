@@ -74,6 +74,7 @@
       // Lift dark and mid-tone albedo without whitening the palette or clipping ivory.
       // Keep pupils and mouth lines dark so expressions stay legible at game distance.
       const keepInk = /eyes|mouth/i.test(mat.name), tone = kind === 'penguin' ? .72 : .64;
+      const chroma = kind === 'penguin' ? 1.28 : 1.32;
       if (mesh.isSkinnedMesh) {
         mesh.skeleton.bones.forEach((bone, i) => nodes.push({ bone, inverse: mesh.skeleton.boneInverses[i] }));
         bindNormal.getNormalMatrix(mesh.bindMatrix);
@@ -85,7 +86,14 @@
         const vc = g.attributes.color;
         const red = color.r * (vc ? vc.getX(i) : 1), green = color.g * (vc ? vc.getY(i) : 1), blue = color.b * (vc ? vc.getZ(i) : 1);
         const peak = Math.max(red, green, blue), lift = keepInk || peak <= 0 ? 1 : Math.pow(peak, tone) / peak;
-        colors.push(red * lift, green * lift, blue * lift);
+        const r = red * lift, greenLit = green * lift, b = blue * lift;
+        const hi = Math.max(r, greenLit, b), lo = Math.min(r, greenLit, b), luminance = .2126 * r + .7152 * greenLit + .0722 * b;
+        // Increase chroma at constant luminance. Leave ivory/ink alone, and stop
+        // at the RGB gamut boundary instead of clipping channels or shifting hue.
+        const saturation = keepInk || hi - lo < hi * .18 ? 1 : Math.min(chroma,
+          luminance / Math.max(luminance - lo, 1e-6), (1 - luminance) / Math.max(hi - luminance, 1e-6));
+        colors.push(luminance + (r - luminance) * saturation,
+          luminance + (greenLit - luminance) * saturation, luminance + (b - luminance) * saturation);
         for (let k = 0; k < 2; k++) {
           // These authored rigs use at most two influences at every vertex.
           joints.push(first + (mesh.isSkinnedMesh ? g.attributes.skinIndex.array[i * 4 + k] : 0));

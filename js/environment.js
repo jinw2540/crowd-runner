@@ -3,6 +3,14 @@
 (function (scope) {
 'use strict';
 const T = scope.THREE, shared = new WeakSet(), cache = new Map();
+// Edit these ranges to tune the small floes. Scale is relative to each source
+// model; gaps are world units between conservative footprint circles.
+const FLOE_LAYOUT = {
+  smallScale: { min: .43, max: 1.03 },
+  smallSnowyScale: { min: .4, max: .64 },
+  gap: { min: .9, max: 2.1 },
+  clusterSpacing: 21 // Minimum distance between the first floes of two clusters.
+};
 const linear = hex => new T.Color(hex).convertSRGBToLinear();
 const materials = [
   new T.MeshPhongMaterial({ vertexColors: true, shininess: 65, specular: linear(0x9ccbd8) }),
@@ -113,6 +121,7 @@ function road(width, length) {
 function floe(variant) { return groupFrom(asset(variant).parts, 'Soft ice ' + variant); }
 
 function driftField({ length, halfWidth, seaY, random, reserved = [] }) {
+  const sample = range => range.min + random() * (range.max - range.min);
   const root = new T.Group(); root.name = 'Drifting rounded and jagged floes';
   const groups = new Map(), placements = [], dummy = new T.Object3D();
   const clearings = [], clusters = [], minZ = 20 - length, maxZ = 18;
@@ -131,14 +140,14 @@ function driftField({ length, halfWidth, seaY, random, reserved = [] }) {
     if (!variant) variant = size === 'small' ? (random() < .84 ? 'small' : 'snowy')
       : size === 'medium' ? (random() < .55 ? 'snowy' : 'large') : (random() < .6 ? 'spiky' : 'large');
     const model = asset(variant);
-    const scale = size === 'small' ? (variant === 'small' ? .43 + random() * .6 : .4 + random() * .24)
+    const scale = size === 'small' ? sample(variant === 'small' ? FLOE_LAYOUT.smallScale : FLOE_LAYOUT.smallSnowyScale)
       : size === 'medium' ? (variant === 'snowy' ? .72 + random() * .38 : .62 + random() * .29) : .94 + random() * .85;
     const thickness = model.info.thickness * scale;
     // Keep tiny floes submerged even at the lowest swell plus the highest bob.
     const freeboard = Math.min(thickness * .68, thickness - .13);
     // The envelope includes the tiny horizontal movement caused by the bobbing tilt.
     return { variant, size, scale, radius: model.radius * scale + .1, x: 0, z: 0,
-      y: seaY + freeboard, gap: .9 + random() * 1.2,
+      y: seaY + freeboard, gap: sample(FLOE_LAYOUT.gap),
       angle: random() * Math.PI * 2, phase: random() * Math.PI * 2, cluster: -1 };
   }
   function fits(e, trial = []) {
@@ -155,7 +164,7 @@ function driftField({ length, halfWidth, seaY, random, reserved = [] }) {
       const first = make('small');
       first.x = side * (halfWidth + (opening ? 6.5 + random() * 6.5 : 5 + random() * 21));
       first.z = opening ? -18 - random() * 16 : minZ + 12 + random() * (length - 30);
-      if (!fits(first) || clusters.some(c => Math.hypot(c.x - first.x, c.z - first.z) < 21)) continue;
+      if (!fits(first) || clusters.some(c => Math.hypot(c.x - first.x, c.z - first.z) < FLOE_LAYOUT.clusterSpacing)) continue;
       const trial = [first];
       for (let i = 1; i < count; i++) for (let attempt = 0; attempt < 28; attempt++) {
         const e = make('small'), parent = trial[Math.floor(random() * trial.length)];
