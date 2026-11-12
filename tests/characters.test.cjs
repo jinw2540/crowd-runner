@@ -88,6 +88,37 @@ for (const kind of ['penguin', 'crab']) for (let tier = 0; tier < 4; tier++) {
   });
 }
 
+test('penguin waddle reads in silhouette while alternating feet stay grounded', () => {
+  for (let tier = 0; tier < 4; tier++) {
+    const model = createCrowdPenguin(T, { tier, growthScale: false, detail: 'low' });
+    const clip = model.clips.find(c => c.name === 'Waddle');
+    model.mixer.stopAllAction(); model.mixer.clipAction(clip).reset().play();
+    const feet = ['Soft_Foot_L', 'Soft_Foot_R'].map(name => model.root.getObjectByName(name).children[0]);
+    const p = new T.Vector3(), head = new T.Vector3(), lift = [0, 0];
+    let left = Infinity, right = -Infinity;
+    for (let frame = 0; frame < 96; frame++) {
+      model.mixer.setTime(clip.duration * frame / 96); model.root.updateMatrixWorld(true);
+      model.head.getWorldPosition(head); left = Math.min(left, head.x); right = Math.max(right, head.x);
+      const soles = feet.map((foot, side) => {
+        let sole = Infinity;
+        const positions = foot.geometry.attributes.position;
+        for (let v = 0; v < positions.count; v++) {
+          p.fromBufferAttribute(positions, v).applyMatrix4(foot.matrixWorld);
+          sole = Math.min(sole, p.y);
+        }
+        lift[side] = Math.max(lift[side], sole);
+        assert(sole >= -.003, `tier ${tier}: foot must not pass through the ice`);
+        return sole;
+      });
+      assert(Math.min(...soles) < .025, `tier ${tier}: keep a supporting foot on the ice`);
+    }
+    assert(right - left > .35, 'weight transfer should remain visible in the small silhouette');
+    assert(right - left < .60, 'keep the sway compact enough for the crowd formation');
+    assert(lift.every(h => h > .09), 'both feet must visibly lift in alternate steps');
+    model.mixer.stopAllAction(); model.mixer.uncacheRoot(model.root);
+  }
+});
+
 test('merge/split, per-tier instance capacity, shadows and fallback keep working', () => {
   const sandbox = {
     THREE: T, CharacterModels, SIZE: 1.4, W: 5, Q: { shadows: true },

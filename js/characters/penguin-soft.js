@@ -149,20 +149,22 @@ scope.createSoftPenguin=function(T,options={}){
     const walk=mode==='Waddle',wave=mode==='Wave';
     const vectors=(node,prop,fn)=>tracks.push(new T.VectorKeyframeTrack(node.name+'.'+prop,times,times.flatMap(t=>fn(t/duration*TAU,t))));
     const rotation=(node,fn)=>{const values=[];times.forEach(t=>{const q=new T.Quaternion().setFromEuler(new T.Euler(...fn(t/duration*TAU,t)));values.push(q.x,q.y,q.z,q.w);});tracks.push(new T.QuaternionKeyframeTrack(node.name+'.quaternion',times,values));};
-    vectors(rig,'position',p=>[walk?.065*Math.sin(p):0,walk?.018-.016*Math.cos(p*2):.007*Math.sin(p),0]);
+    // Shift the torso over the planted foot; feet remain outside this rolling rig.
+    // The broad silhouette reads at runner distance without making the whole bird hop.
+    vectors(rig,'position',p=>[walk?.10*Math.sin(p):0,walk?.030-.025*Math.cos(p*2):.007*Math.sin(p),0]);
     vectors(rig,'scale',p=>{const sy=walk?1-.012*Math.cos(p*2):1+.006*Math.sin(p);return[1/Math.sqrt(sy),sy,1/Math.sqrt(sy)];});
-    rotation(rig,p=>[walk?.035:0,walk?.018*Math.sin(p):0,walk?-.070*Math.sin(p):wave?-.035:.008*Math.sin(p)]);
-    rotation(head,p=>[walk?.025*Math.sin(p*2-.5):-.018+.018*Math.sin(p),walk?-.045*Math.sin(p-.3):.10*Math.sin(p),wave?-.10:.045+.025*Math.sin(p-.6)]);
+    rotation(rig,p=>[walk?.035:0,walk?.028*Math.sin(p):0,walk?-.170*Math.sin(p):wave?-.035:.008*Math.sin(p)]);
+    rotation(head,p=>[walk?.025*Math.sin(p*2-.5):-.018+.018*Math.sin(p),walk?-.045*Math.sin(p-.3):.10*Math.sin(p),walk?.040*Math.sin(p-.3):wave?-.10:.045+.025*Math.sin(p-.6)]);
     shoulders.forEach((w,i)=>{
       const s=i?1:-1;
-      rotation(w,p=>[walk?.14*Math.sin(p+i*Math.PI-.45):.03*Math.sin(p),0,wave&&i===1?1.85+.10*Math.sin(p*3):s*(.13+(walk?.045*Math.cos(p*2):.025*Math.sin(p)))]);
-      rotation(tips[i],p=>[walk?.07*Math.sin(p+i*Math.PI-.8):0,0,wave&&i===1?.30*Math.sin(p*3-.4):s*.08*Math.sin(p-.6)]);
+      rotation(w,p=>[walk?.18*Math.sin(p+i*Math.PI-.45):.03*Math.sin(p),0,wave&&i===1?1.85+.10*Math.sin(p*3):s*(.13+(walk?.060*Math.cos(p*2):.025*Math.sin(p)))]);
+      rotation(tips[i],p=>[walk?.09*Math.sin(p+i*Math.PI-.8):0,0,wave&&i===1?.30*Math.sin(p*3-.4):s*.08*Math.sin(p-.6)]);
     });
     feet.forEach((f,i)=>{const s=i?1:-1;
-      vectors(f,'position',p=>{const q=p+i*Math.PI;return[s*.285,.072+(walk?.105*Math.pow(Math.max(0,Math.sin(q)),2):0),.12+(walk?-.12*Math.cos(q):0)];});
-      rotation(f,p=>[walk?.15*Math.sin(p+i*Math.PI):0,s*.17,0]);
+      vectors(f,'position',p=>{const q=p+i*Math.PI;return[s*.285,.072+(walk?.145*Math.pow(Math.max(0,Math.sin(q)),2):0),.12+(walk?-.17*Math.cos(q):0)];});
+      rotation(f,p=>[walk?.20*Math.sin(p+i*Math.PI):0,s*.17,0]);
     });
-    scarfTails.forEach((s,i)=>rotation(s,p=>[(walk?.055:.012)*Math.sin(p-1.0-i*.30),.018*Math.sin(p-.5),(i?.22:-.12)+.025*Math.sin(p-.9-i*.20)]));
+    scarfTails.forEach((s,i)=>rotation(s,p=>[(walk?.085:.012)*Math.sin(p-1.0-i*.30),.018*Math.sin(p-.5),(i?.22:-.12)+(walk?.040:.025)*Math.sin(p-.9-i*.20)]));
     // Blinks are part of the exported idle/wave animation as well.
     lids.forEach((lid,i)=>vectors(lid,'scale',(p,t)=>{
       const centers=walk?[]:[duration*.36,duration*.84];let y=1;
