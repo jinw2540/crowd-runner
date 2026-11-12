@@ -6,9 +6,9 @@ const T = scope.THREE, shared = new WeakSet(), cache = new Map();
 // Edit these ranges to tune the small floes. Scale is relative to each source
 // model; gaps are world units between conservative footprint circles.
 const FLOE_LAYOUT = {
-  smallScale: { min: .43, max: 1.03 },
-  smallSnowyScale: { min: .4, max: .64 },
-  gap: { min: .9, max: 2.1 },
+  smallScale: { min: .9, max: 3.0 },
+  smallSnowyScale: { min: .8, max: 4 },
+  gap: { min: .9, max: 2.5 },
   clusterSpacing: 21 // Minimum distance between the first floes of two clusters.
 };
 const linear = hex => new T.Color(hex).convertSRGBToLinear();
@@ -152,7 +152,7 @@ function driftField({ length, halfWidth, seaY, random, reserved = [] }) {
   }
   function fits(e, trial = []) {
     const side = Math.sign(e.x), edge = Math.abs(e.x) - e.radius;
-    if (edge < halfWidth + 2.7 || Math.abs(e.x) + e.radius > halfWidth + 58 || e.z - e.radius < minZ || e.z + e.radius > maxZ) return false;
+    if (edge < halfWidth + 2.7 || Math.abs(e.x) + e.radius > 300 || e.z - e.radius < minZ || e.z + e.radius > maxZ) return false;
     if (e.size === 'large' && edge < halfWidth + 16) return false;
     if (clearings.some(g => g.side === side && edge < g.edge && Math.abs(e.z - g.z) < e.radius + g.halfLength)) return false;
     const overlaps = other => Math.hypot(e.x - other.x, e.z - other.z) < e.radius + other.radius + Math.max(e.gap, other.gap || 1.2);
