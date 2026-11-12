@@ -71,6 +71,9 @@
         const hex = /woven rust/.test(mat.name) ? 0xba7356 : /knitted wool/.test(mat.name) ? 0xb67455 : 0xf0f0f0;
         color.multiply(new T.Color(hex).convertSRGBToLinear());
       }
+      // Lift dark and mid-tone albedo without whitening the palette or clipping ivory.
+      // Keep pupils and mouth lines dark so expressions stay legible at game distance.
+      const keepInk = /eyes|mouth/i.test(mat.name), tone = kind === 'penguin' ? .72 : .64;
       if (mesh.isSkinnedMesh) {
         mesh.skeleton.bones.forEach((bone, i) => nodes.push({ bone, inverse: mesh.skeleton.boneInverses[i] }));
         bindNormal.getNormalMatrix(mesh.bindMatrix);
@@ -80,7 +83,9 @@
         if (mesh.isSkinnedMesh) { p.applyMatrix4(mesh.bindMatrix); n.applyMatrix3(bindNormal).normalize(); }
         positions.push(p.x, p.y, p.z); normals.push(n.x, n.y, n.z);
         const vc = g.attributes.color;
-        colors.push(color.r * (vc ? vc.getX(i) : 1), color.g * (vc ? vc.getY(i) : 1), color.b * (vc ? vc.getZ(i) : 1));
+        const red = color.r * (vc ? vc.getX(i) : 1), green = color.g * (vc ? vc.getY(i) : 1), blue = color.b * (vc ? vc.getZ(i) : 1);
+        const peak = Math.max(red, green, blue), lift = keepInk || peak <= 0 ? 1 : Math.pow(peak, tone) / peak;
+        colors.push(red * lift, green * lift, blue * lift);
         for (let k = 0; k < 2; k++) {
           // These authored rigs use at most two influences at every vertex.
           joints.push(first + (mesh.isSkinnedMesh ? g.attributes.skinIndex.array[i * 4 + k] : 0));
@@ -185,7 +190,7 @@
       characterTime: { value: 0 }, characterClip: { value: 0 }, characterPreviousClip: { value: 0 }, characterTransition: { value: 1 },
       characterDurations: { value: new T.Vector3(...asset.durations) }
     };
-    // A small albedo lift keeps the approved navy/coral colours readable against bright snow.
+    // Neutral exposure complements the baked palette lift across every growth tier.
     const material = new T.MeshLambertMaterial({ color: new T.Color(1.16, 1.16, 1.16), vertexColors: true });
     const depth = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking });
     const patch = shader => {
