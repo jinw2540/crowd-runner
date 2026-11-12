@@ -55,6 +55,7 @@ class CrowdView {
     this.tilt = 0; this.tiltT = 0;    // lean into steering
     this.arms = 0; this.armsT = 0;    // wings or claws raised
     this.jump = 0; this.flinch = 0;   // one-shot reactions, 1 -> 0
+    this.impactAge = 1; this.impactStrength = 0; this.impactSide = 1; this.victoryHop = 0;
     this.value = 0;
     this.tiers = [[], [], [], []];    // live units by size
     this.leaving = [];                // units shrinking away or flying into a merge
@@ -69,6 +70,9 @@ class CrowdView {
     this.group.add(this.shadow);
   }
   get radius() { return this.r; }
+  impact(strength, side) { this.impactAge = 0; this.impactStrength = clamp(strength, 0, 1); this.impactSide = side; }
+  celebrateImpact() { this.victoryHop = 1; }
+  resetImpact() { this.impactAge = 1; this.impactStrength = 0; this.victoryHop = 0; }
   footprint(tier) { return 0.28 * TIER_SCALE[tier] * (this.crab ? 1.2 : 1); }
   compose(n) {
     n = Math.max(0, Math.floor(n));
@@ -139,6 +143,8 @@ class CrowdView {
     this.arms += (this.armsT - this.arms) * Math.min(1, dt * 8);
     this.jump = Math.max(0, this.jump - dt / 0.42);
     this.flinch = Math.max(0, this.flinch - dt / 0.45);
+    this.impactAge = Math.min(1, this.impactAge + dt / .30);
+    this.victoryHop = Math.max(0, this.victoryHop - dt / .36);
     this._mode = this.mode || (this.hop >= 1 ? 'run' : 'idle');
     this._jumpY = this.jump > 0 ? Math.sin((1 - this.jump) * Math.PI) * 0.7 : 0;
     this._n = 0; this._counts = [0, 0, 0, 0];
@@ -176,10 +182,17 @@ class CrowdView {
       const up = Math.abs(Math.sin(t * 7 / (1 + tier * 0.2) + ph));
       y = up * 0.4; st = 1 + (up - 0.4) * 0.12; ry = t * 2 / (1 + tier * 0.4) + ph;
     } else ry = Math.sin(t * 0.7 + ph * 2) * (crab ? 0.1 : 0.2);
+    // A brief lunge/recoil is visual only; wx/wz below remain the collision positions.
+    const impact = Math.sin(this.impactAge * Math.PI) * this.impactStrength;
+    const push = Math.sin(this.impactAge * Math.PI * 2) * this.impactStrength;
+    rx += (crab ? 1 : -1) * push * .11;
+    rz += impact * this.impactSide * .085 * (.8 + .2 * Math.sin(ph));
+    y += impact * .025; st *= 1 - impact * .055;
+    if (this.victoryHop > 0) y += Math.sin((1 - this.victoryHop) * Math.PI) * .10;
     if (this._jumpY > 0) { y += this._jumpY * (0.8 + (ph % 1) * 0.4); st += this._jumpY * 0.25; }
     const wide = 1 / Math.sqrt(st), edge = Math.min(W - 0.25, Math.max(0.25, W - u.fr * 0.6));
     const x = u.wx = clamp(this.cx + u.ox, -edge, edge), z = u.wz = this.cz + u.oz, yy = y * scale;
-    dummy.position.set(x, yy, z);
+    dummy.position.set(x, yy, z + (crab ? 1 : -1) * push * .05 * scale);
     dummy.rotation.set(rx, ry, rz);
     dummy.scale.set(size * wide, size * st, size * wide);
     dummy.updateMatrix();

@@ -146,3 +146,22 @@ test('merge/split, per-tier instance capacity, shadows and fallback keep working
   assert.equal(fallback.batches[3].mesh.geometry.attributes.characterJoint, undefined);
   assert.equal(fallback.batches[3].mesh.count, 1);
 });
+
+test('impact poses move the render instances without moving collision positions', () => {
+  const sandbox = { THREE: T, CharacterModels, SIZE: 1.4, W: 5, Q: { shadows: true },
+    clamp: (v, a, b) => Math.max(a, Math.min(b, v)), scene: new T.Scene(),
+    renderer: { capabilities: { vertexTextures: true, isWebGL2: true } } };
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/crowd.js'), 'utf8') + '\nthis.CrowdView=CrowdView;', sandbox);
+  for (const kind of ['penguin', 'crab']) {
+    const crowd = new sandbox.CrowdView(kind); crowd.mode = 'run'; crowd.setValue(1111, { instant: true }); crowd.update(0, 0);
+    const positions = () => Array.from(crowd.tiers, list => Array.from(list, u => [u.wx, u.wz]));
+    const before = positions(), matrix = new T.Matrix4(), after = new T.Matrix4();
+    crowd.batches[3].mesh.getMatrixAt(0, matrix);
+    crowd.impact(1, 1); crowd.celebrateImpact(); crowd.update(.06, .06);
+    assert.deepEqual(positions(), before); crowd.batches[3].mesh.getMatrixAt(0, after);
+    assert(!matrix.equals(after)); assert(after.elements.every(Number.isFinite));
+    crowd.resetImpact(); crowd.update(0, .06); crowd.batches[3].mesh.getMatrixAt(0, after);
+    assert(matrix.equals(after), 'reset must remove combat transforms');
+  }
+});
